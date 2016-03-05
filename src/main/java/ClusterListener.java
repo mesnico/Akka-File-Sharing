@@ -20,6 +20,7 @@ import java.util.Comparator;
 import java.util.PriorityQueue;
 import java.util.Random;
 import java.util.TreeMap;
+import java.util.function.Consumer;
 
 /*
  * To change this license header, choose License Headers in Project Properties.
@@ -35,7 +36,7 @@ public class ClusterListener extends UntypedActor {
     LoggingAdapter log = Logging.getLogger(getContext().system(), this);
     Cluster cluster = Cluster.get(getContext().system());
     TreeMap<BigInteger, Member> membersMap;
-    PriorityQueue membersFreeSpace;
+    PriorityQueue<FreeSpaceElement> membersFreeSpace;
     String localAddress;
     
     final long myFreeSpace = new Random().nextLong();    //THIS IS GENERATED INTERNALLY BUT IT SHOULD NOT (should be taken from mine file table)
@@ -49,7 +50,7 @@ public class ClusterListener extends UntypedActor {
         membersMap = new TreeMap();
          
         //construct the free space priority queue
-        membersFreeSpace = new PriorityQueue(10,new Comparator<FreeSpaceElement>(){
+        membersFreeSpace = new PriorityQueue<FreeSpaceElement>(10,new Comparator<FreeSpaceElement>(){
             @Override
             public int compare(FreeSpaceElement o1, FreeSpaceElement o2){
                 return (int)(o1.getFreeByteSpace() - o2.getFreeByteSpace());
@@ -79,12 +80,13 @@ public class ClusterListener extends UntypedActor {
             log.info("{} -->Member is Up: {}", localAddress, mUp.member().address().hostPort());
 
             //inserts the new member in the map
-            membersMap.put(computeMemberHash(mUp.member()), mUp.member());
-            System.out.println(membersMap);
+            membersMap.put(computeMemberHash(mUp.member().address().hostPort()), mUp.member());
+            
+            System.out.println("----"+membersMap);
             
             //send my free space to the new arrived member
             getContext().actorSelection(mUp.member().address() + "/user/clusterListener")
-                    .tell(new FreeSpaceElement(mUp.member(),myFreeSpace), getSelf());
+                    .tell(new FreeSpaceElement(localAddress,myFreeSpace), getSelf());
 
         } else if (message instanceof UnreachableMember) {
             UnreachableMember mUnreachable = (UnreachableMember) message;
@@ -95,20 +97,30 @@ public class ClusterListener extends UntypedActor {
             log.info("Member is Removed: {}", mRemoved.member());
             
             if(mRemoved.previousStatus()==MemberStatus.down()){
-                //the member removed was removed because crashed
+                //the member was removed because crashed
             } else {
                 //the member shutted down gracefully
             }
             
             //in any case, the member is removed from the local structure
-            membersMap.remove(computeMemberHash(mRemoved.member()));
-
+            membersMap.remove(computeMemberHash(mRemoved.member().address().hostPort()));
+            
+            //the member is also removed from the free space queue
+            //the only way is to search it by member address and to delete it.
+            for(FreeSpaceElement e : membersFreeSpace){
+                if(e.getMemberAddress().equals(mRemoved.member().address().hostPort())){
+                    membersFreeSpace.remove(e);
+                }
+            }
+            
+            System.out.println("----"+membersMap+"\n----"+membersFreeSpace);
+            
         //message sent when the new member arrives in the cluster. The map has to be immediately filled with the current state
         } else if (message instanceof CurrentClusterState) {
             CurrentClusterState state = (CurrentClusterState) message;
             for (Member member : state.getMembers()) {
                 if (member.status().equals(MemberStatus.up())) {
-                    membersMap.put(computeMemberHash(member),member);
+                    membersMap.put(computeMemberHash(member.address().hostPort()),member);
                 }
             }
             
@@ -126,11 +138,11 @@ public class ClusterListener extends UntypedActor {
         }
     }
 
-    private BigInteger computeMemberHash(Member member) {
+    private BigInteger computeMemberHash(String memberAddress) {
         try {
             MessageDigest md = MessageDigest.getInstance("MD5");
             md.reset();
-            md.update(member.address().hostPort().getBytes("UTF-8"));
+            md.update(memberAddress.getBytes("UTF-8"));
             return new BigInteger(md.digest());
         } catch (NoSuchAlgorithmException e) {
             return BigInteger.ZERO;

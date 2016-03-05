@@ -22,20 +22,19 @@ public class Main {
             startup(args);
     }
 
-    public static void startup(String[] ports) {
-        for (String port : ports) {
+    public static void startup(String[] port) {
         // Override the configuration of the port
             Config config = ConfigFactory.parseString(
-                "akka.remote.netty.tcp.port=" + port).withFallback(
+                "akka.remote.netty.tcp.port=" + port[0]).withFallback(
                 ConfigFactory.load());
 
         // Create an Akka system
             ActorSystem system = ActorSystem.create("ClusterSystem", config);
 
         // Create an actor that handles cluster domain events
-            system.actorOf(Props.create(ClusterListener.class,port),
+            system.actorOf(Props.create(ClusterListener.class,port[0]),
                 "clusterListener");
 
-        }
+        
     }
 }

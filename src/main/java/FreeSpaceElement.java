@@ -13,16 +13,16 @@ import java.io.Serializable;
  * @author nicky
  */
 public class FreeSpaceElement implements Serializable {
-    Member member;
+    String memberAddress;
     long freeByteSpace;
     
-    public FreeSpaceElement(Member member, long freeByteSpace){
-        this.member = member;
+    public FreeSpaceElement(String memberAddress, long freeByteSpace){
+        this.memberAddress = memberAddress;
         this.freeByteSpace = freeByteSpace;
     }
     
-    public Member getMember(){
-        return member;
+    public String getMemberAddress(){
+        return memberAddress;
     }
     
     public long getFreeByteSpace(){
@@ -31,6 +31,6 @@ public class FreeSpaceElement implements Serializable {
     
     @Override
     public String toString(){
-        return member.address()+" has "+freeByteSpace+" bytes free";
+        return memberAddress+" has "+freeByteSpace+" bytes free";
     }
 }
