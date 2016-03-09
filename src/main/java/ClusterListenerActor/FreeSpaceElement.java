@@ -1,6 +1,9 @@
+package ClusterListenerActor;
+
 
 import akka.cluster.Member;
 import java.io.Serializable;
+import java.math.BigInteger;
 
 /*
  * To change this license header, choose License Headers in Project Properties.
@@ -13,16 +16,16 @@ import java.io.Serializable;
  * @author nicky
  */
 public class FreeSpaceElement implements Serializable {
-    String memberAddress;
+    BigInteger memberID;
     long freeByteSpace;
     
-    public FreeSpaceElement(String memberAddress, long freeByteSpace){
-        this.memberAddress = memberAddress;
+    public FreeSpaceElement(BigInteger memberID, long freeByteSpace){
+        this.memberID = memberID;
         this.freeByteSpace = freeByteSpace;
     }
     
-    public String getMemberAddress(){
-        return memberAddress;
+    public BigInteger getMemberID(){
+        return memberID;
     }
     
     public long getFreeByteSpace(){
@@ -31,6 +34,6 @@ public class FreeSpaceElement implements Serializable {
     
     @Override
     public String toString(){
-        return memberAddress+" has "+freeByteSpace+" bytes free";
+        return memberID+" has "+freeByteSpace+" bytes free";
     }
 }

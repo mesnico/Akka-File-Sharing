@@ -1,3 +1,4 @@
+package ClusterListenerActor;
 
 import akka.actor.Address;
 import akka.actor.UntypedActor;
@@ -31,7 +32,7 @@ import java.util.function.Consumer;
  *
  * @author nicky
  */
-public class ClusterListener extends UntypedActor {
+public class ClusterListenerActor extends UntypedActor {
 
     LoggingAdapter log = Logging.getLogger(getContext().system(), this);
     Cluster cluster = Cluster.get(getContext().system());
@@ -39,12 +40,17 @@ public class ClusterListener extends UntypedActor {
     PriorityQueue<FreeSpaceElement> membersFreeSpace;
     String localAddress;
     
+    int clusterPort, clientPort;
     final long myFreeSpace = new Random().nextLong();    //THIS IS GENERATED INTERNALLY BUT IT SHOULD NOT (should be taken from mine file table)
     
-    public ClusterListener(String port){
+    public ClusterListenerActor(int clusterPort){
+        //cluster port is that specified from the user; instead the client port (for handling of the files) is opened in clusterPort + 1
+        this.clusterPort = clusterPort;
+        this.clientPort = clusterPort + 1;
+        
         //transforms the local reference to remote reference to uniformate hash accesses in case of remote actor
         Address mineAddress = getSelf().path().address();
-        localAddress = (mineAddress.hasLocalScope()) ? mineAddress.hostPort()+"@127.0.0.1:"+port : mineAddress.hostPort();
+        localAddress = getAddress(mineAddress);
         
         //construct the members map
         membersMap = new TreeMap();
@@ -77,16 +83,17 @@ public class ClusterListener extends UntypedActor {
     public void onReceive(Object message) {
         if (message instanceof MemberUp) {
             MemberUp mUp = (MemberUp) message;
-            log.info("{} -->Member is Up: {}", localAddress, mUp.member().address().hostPort());
+            System.out.println("member up: "+getAddress(mUp.member().address()));
+            log.info("{} -->Member is Up: {}", localAddress, getAddress(mUp.member().address()));
 
             //inserts the new member in the map
-            membersMap.put(computeMemberHash(mUp.member().address().hostPort()), mUp.member());
+            membersMap.put(computeMemberID(getAddress(mUp.member().address())), mUp.member());    //IS IT RIGHT?
             
             System.out.println("----"+membersMap);
             
             //send my free space to the new arrived member
             getContext().actorSelection(mUp.member().address() + "/user/clusterListener")
-                    .tell(new FreeSpaceElement(localAddress,myFreeSpace), getSelf());
+                    .tell(new FreeSpaceSpread(myFreeSpace), getSelf());
 
         } else if (message instanceof UnreachableMember) {
             UnreachableMember mUnreachable = (UnreachableMember) message;
@@ -103,12 +110,12 @@ public class ClusterListener extends UntypedActor {
             }
             
             //in any case, the member is removed from the local structure
-            membersMap.remove(computeMemberHash(mRemoved.member().address().hostPort()));
+            membersMap.remove(computeMemberID(mRemoved.member().address().hostPort()));
             
             //the member is also removed from the free space queue
             //the only way is to search it by member address and to delete it.
             for(FreeSpaceElement e : membersFreeSpace){
-                if(e.getMemberAddress().equals(mRemoved.member().address().hostPort())){
+                if(e.getMemberID() == computeMemberID(getAddress(mRemoved.member().address()))){  //IS IT RIGHT?
                     membersFreeSpace.remove(e);
                 }
             }
@@ -120,15 +127,16 @@ public class ClusterListener extends UntypedActor {
             CurrentClusterState state = (CurrentClusterState) message;
             for (Member member : state.getMembers()) {
                 if (member.status().equals(MemberStatus.up())) {
-                    membersMap.put(computeMemberHash(member.address().hostPort()),member);
+                    membersMap.put(computeMemberID(member.address().hostPort()),member);
                 }
             }
             
-        } else if (message instanceof FreeSpaceElement){
+        } else if (message instanceof FreeSpaceSpread){
             //insert the received information about the free space in the current priority queue.
-            FreeSpaceElement receivedFreeSpace = (FreeSpaceElement) message;
-            membersFreeSpace.add(receivedFreeSpace);
-            log.info("--- Received free space: {}",receivedFreeSpace);
+            FreeSpaceSpread receivedFreeSpace = (FreeSpaceSpread) message;
+            membersFreeSpace.add(new FreeSpaceElement(computeMemberID(getAddress(getSender().path().address())),receivedFreeSpace.getFreeByteSpace()));  //IS IT RIGHT?
+            System.out.println(getAddress(getSender().path().address())+"told me "+receivedFreeSpace.getFreeByteSpace());
+            log.info("Free Space Infos: {}",membersFreeSpace);
 
         } else if (message instanceof MemberEvent) {
             // ignore
@@ -138,7 +146,8 @@ public class ClusterListener extends UntypedActor {
         }
     }
 
-    private BigInteger computeMemberHash(String memberAddress) {
+    //compute the member ID starting from the member address using the hash function
+    private BigInteger computeMemberID(String memberAddress) {
         try {
             MessageDigest md = MessageDigest.getInstance("MD5");
             md.reset();
@@ -149,5 +158,10 @@ public class ClusterListener extends UntypedActor {
         } catch (UnsupportedEncodingException e) {
             return BigInteger.ZERO;
         }
+    }
+    
+    //returns a string containing the remote address
+    private String getAddress(Address address){
+        return (address.hasLocalScope()) ? address.hostPort()+"@127.0.0.1:"+clusterPort : address.hostPort();
     }
 }
