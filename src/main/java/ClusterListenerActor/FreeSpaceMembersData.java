@@ -16,7 +16,7 @@ import java.util.PriorityQueue;
  */
 public class FreeSpaceMembersData {
     
-    public PriorityQueue<FreeSpaceElement> freeSpace;
+    private PriorityQueue<FreeSpaceElement> freeSpace;
     
     public FreeSpaceMembersData(){
         freeSpace = new PriorityQueue<FreeSpaceElement>(10,new Comparator<FreeSpaceElement>(){
@@ -53,5 +53,10 @@ public class FreeSpaceMembersData {
                 return e.getFreeByteSpace();
             }
         return -1;
+    }
+    
+    @Override
+    public String toString(){
+        return freeSpace.toString();
     }
 }

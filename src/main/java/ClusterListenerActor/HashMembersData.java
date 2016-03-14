@@ -14,7 +14,7 @@ import java.util.TreeMap;
  * @author francescop
  */
 public class HashMembersData {
-    public TreeMap<BigInteger,Member> memberList;
+    private TreeMap<BigInteger,Member> memberList;
     public HashMembersData(){
         memberList = new TreeMap();
     }
@@ -34,7 +34,12 @@ public class HashMembersData {
         return memberList.ceilingEntry(memberId).getValue();
     }
     //Removes the mapping for this id from this TreeMap if present.
-    public void deleteMemberById(BigInteger memberId){
-        memberList.remove(memberId);
+    public Member deleteMemberById(BigInteger memberId){
+        return memberList.remove(memberId);
+    }
+    
+    @Override
+    public String toString(){
+        return memberList.toString();
     }
 }

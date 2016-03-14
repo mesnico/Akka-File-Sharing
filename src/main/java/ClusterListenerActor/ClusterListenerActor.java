@@ -48,18 +48,9 @@ public class ClusterListenerActor extends UntypedActor {
         Address mineAddress = getSelf().path().address();
         localAddress = getAddress(mineAddress);
         
-        //construct the members map
+        //construct the members map and member free space map
         membersMap = new HashMembersData();
         membersFreeSpace = new FreeSpaceMembersData();
-        
-        /*
-        //construct the free space priority queue
-        membersFreeSpace = new PriorityQueue<FreeSpaceElement>(10,new Comparator<FreeSpaceElement>(){
-            @Override
-            public int compare(FreeSpaceElement o1, FreeSpaceElement o2){
-                return (int)(o1.getFreeByteSpace() - o2.getFreeByteSpace());
-            }
-        });*/
     }
 
     //subscribe to cluster changes
@@ -81,68 +72,66 @@ public class ClusterListenerActor extends UntypedActor {
     public void onReceive(Object message) {
         if (message instanceof MemberUp) {
             MemberUp mMemberUp = (MemberUp) message;
-            System.out.println("*member up: "+getAddress(mMemberUp.member().address()));
-            //log.info("{} -->Member is Up: {}", localAddress, getAddress(mMemberUp.member().address()));
+            log.info("{} -->Member is Up: {}", localAddress, getAddress(mMemberUp.member().address()));
 
             //inserts the new member in the map
             membersMap.newMember(computeMemberID(getAddress(mMemberUp.member().address())), mMemberUp.member());    //IS IT RIGHT?
-            System.out.println("*new Member inserted in membersMap");
-            System.out.println("+"+membersMap.memberList);
+            log.info("new Member inserted in membersMap: {}",mMemberUp.member());
+            log.debug("Current membersMap status: {} ",membersMap);
            
             //send my free space to the new arrived member
             getContext().actorSelection(mMemberUp.member().address() + "/user/clusterListener")
                     .tell(new FreeSpaceSpread(myFreeSpace), getSelf());
 
         } else if (message instanceof UnreachableMember) {
-            UnreachableMember mUnreachable = (UnreachableMember) message;
-            //log.info("Member detected as unreachable: {}", mUnreachable.member());
+            UnreachableMember mMemberUnreachable = (UnreachableMember) message;
+            log.info("Member detected as unreachable: {}", mMemberUnreachable.member());
 
         } else if (message instanceof MemberRemoved) {
-            MemberRemoved mRemoved = (MemberRemoved) message;
-            //log.info("Member is Removed: {}", mRemoved.member());
+            MemberRemoved mMemberRemoved = (MemberRemoved) message;
+            log.info("Member is Removed: {}", mMemberRemoved.member());
             
-            if(mRemoved.previousStatus()==MemberStatus.down()){
+            if(mMemberRemoved.previousStatus()==MemberStatus.down()){
                 //the member was removed because crashed
             } else {
                 //the member shutted down gracefully
             }
             
             //in any case, the member is removed from the local structure
-            membersMap.deleteMemberById(computeMemberID(mRemoved.member().address().hostPort()));
-            System.out.println("+"+membersMap.memberList);
+            Member removed = membersMap.deleteMemberById(computeMemberID(getAddress(mMemberRemoved.member().address())));
+            if(removed == null){
+                log.error("Member {} does not exist in membersMap!!",mMemberRemoved.member());
+            } else {
+                log.info("Member removed in membersMap: {}",mMemberRemoved.member());
+                log.debug("Current membersMap status: {} ",membersMap);
+            }
             
             //the member is also removed from the free space queue
             //the only way is to search it by member address and to delete it.
-            membersFreeSpace.deleteByMember(computeMemberID(getAddress(mRemoved.member().address())));
-            System.out.println("+"+membersFreeSpace.freeSpace);
-            /*
-            for(FreeSpaceElement e : membersFreeSpace){
-                if(e.getMemberID() == computeMemberID(getAddress(mRemoved.member().address()))){  //IS IT RIGHT?
-                    membersFreeSpace.remove(e);
-                }
+            boolean exists = membersFreeSpace.deleteByMember(computeMemberID(getAddress(mMemberRemoved.member().address())));
+            if(!exists){
+                log.error("Member {} does not exist in membersFreeSpace!!",mMemberRemoved.member());
+            } else {
+                log.info("Member removed in membersFreeSpace: {}",mMemberRemoved.member());
+                log.debug("Current membersFreeSpace status: {} ",membersFreeSpace);
             }
-            
-            System.out.println("----"+membersMap+"\n----"+membersFreeSpace);*/
-            
         //message sent when the new member arrives in the cluster. The map has to be immediately filled with the current state
         } else if (message instanceof CurrentClusterState) {
             CurrentClusterState state = (CurrentClusterState) message;
             for (Member member : state.getMembers()) {
                 if (member.status().equals(MemberStatus.up())) {
                     membersMap.newMember(computeMemberID(member.address().hostPort()),member);
-                    System.out.println("+"+membersMap.memberList);
                 }
             }
+            log.info("membersMap initialized: {}",membersMap);
             
         } else if (message instanceof FreeSpaceSpread){
-            System.out.println("*FreeSpaceSpread context");
             //insert the received information about the free space in the current priority queue.
             FreeSpaceSpread receivedFreeSpace = (FreeSpaceSpread) message;
             System.out.println(getSelf() + " " + getSender());
             membersFreeSpace.newMember(computeMemberID(getAddress(getSender().path().address())), receivedFreeSpace.getFreeByteSpace());  //IS IT RIGHT?
-            System.out.println("+"+membersFreeSpace.freeSpace);
-            System.out.println("**"+getAddress(getSender().path().address())+" told me "+receivedFreeSpace.getFreeByteSpace());
-            //log.info("Free Space Infos: {}",membersFreeSpace);
+            log.info("Added {} with {} bytes free",getAddress(getSender().path().address()),receivedFreeSpace.getFreeByteSpace());
+            log.debug("Free space infos: {}",membersFreeSpace);
 
         } else if (message instanceof MemberEvent) {
             // ignore
