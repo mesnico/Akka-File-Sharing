@@ -31,6 +31,9 @@ public class FreeSpaceElement implements Serializable {
     public long getFreeByteSpace(){
         return freeByteSpace;
     }
+    public void setFreeByteSpace(long freeByteSpace) {
+        this.freeByteSpace = freeByteSpace;
+    }
     
     @Override
     public String toString(){

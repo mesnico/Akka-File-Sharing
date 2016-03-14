@@ -17,11 +17,7 @@ import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Comparator;
-import java.util.PriorityQueue;
 import java.util.Random;
-import java.util.TreeMap;
-import java.util.function.Consumer;
 
 /*
  * To change this license header, choose License Headers in Project Properties.
@@ -36,8 +32,8 @@ public class ClusterListenerActor extends UntypedActor {
 
     LoggingAdapter log = Logging.getLogger(getContext().system(), this);
     Cluster cluster = Cluster.get(getContext().system());
-    TreeMap<BigInteger, Member> membersMap;
-    PriorityQueue<FreeSpaceElement> membersFreeSpace;
+    HashMembersData membersMap;
+    FreeSpaceMembersData membersFreeSpace;
     String localAddress;
     
     int clusterPort, clientPort;
@@ -53,15 +49,17 @@ public class ClusterListenerActor extends UntypedActor {
         localAddress = getAddress(mineAddress);
         
         //construct the members map
-        membersMap = new TreeMap();
-         
+        membersMap = new HashMembersData();
+        membersFreeSpace = new FreeSpaceMembersData();
+        
+        /*
         //construct the free space priority queue
         membersFreeSpace = new PriorityQueue<FreeSpaceElement>(10,new Comparator<FreeSpaceElement>(){
             @Override
             public int compare(FreeSpaceElement o1, FreeSpaceElement o2){
                 return (int)(o1.getFreeByteSpace() - o2.getFreeByteSpace());
             }
-        });
+        });*/
     }
 
     //subscribe to cluster changes
@@ -82,26 +80,26 @@ public class ClusterListenerActor extends UntypedActor {
     @Override
     public void onReceive(Object message) {
         if (message instanceof MemberUp) {
-            MemberUp mUp = (MemberUp) message;
-            System.out.println("member up: "+getAddress(mUp.member().address()));
-            log.info("{} -->Member is Up: {}", localAddress, getAddress(mUp.member().address()));
+            MemberUp mMemberUp = (MemberUp) message;
+            System.out.println("*member up: "+getAddress(mMemberUp.member().address()));
+            //log.info("{} -->Member is Up: {}", localAddress, getAddress(mMemberUp.member().address()));
 
             //inserts the new member in the map
-            membersMap.put(computeMemberID(getAddress(mUp.member().address())), mUp.member());    //IS IT RIGHT?
-            
-            System.out.println("----"+membersMap);
-            
+            membersMap.newMember(computeMemberID(getAddress(mMemberUp.member().address())), mMemberUp.member());    //IS IT RIGHT?
+            System.out.println("*new Member inserted in membersMap");
+            System.out.println("+"+membersMap.memberList);
+           
             //send my free space to the new arrived member
-            getContext().actorSelection(mUp.member().address() + "/user/clusterListener")
+            getContext().actorSelection(mMemberUp.member().address() + "/user/clusterListener")
                     .tell(new FreeSpaceSpread(myFreeSpace), getSelf());
 
         } else if (message instanceof UnreachableMember) {
             UnreachableMember mUnreachable = (UnreachableMember) message;
-            log.info("Member detected as unreachable: {}", mUnreachable.member());
+            //log.info("Member detected as unreachable: {}", mUnreachable.member());
 
         } else if (message instanceof MemberRemoved) {
             MemberRemoved mRemoved = (MemberRemoved) message;
-            log.info("Member is Removed: {}", mRemoved.member());
+            //log.info("Member is Removed: {}", mRemoved.member());
             
             if(mRemoved.previousStatus()==MemberStatus.down()){
                 //the member was removed because crashed
@@ -110,33 +108,41 @@ public class ClusterListenerActor extends UntypedActor {
             }
             
             //in any case, the member is removed from the local structure
-            membersMap.remove(computeMemberID(mRemoved.member().address().hostPort()));
+            membersMap.deleteMemberById(computeMemberID(mRemoved.member().address().hostPort()));
+            System.out.println("+"+membersMap.memberList);
             
             //the member is also removed from the free space queue
             //the only way is to search it by member address and to delete it.
+            membersFreeSpace.deleteByMember(computeMemberID(getAddress(mRemoved.member().address())));
+            System.out.println("+"+membersFreeSpace.freeSpace);
+            /*
             for(FreeSpaceElement e : membersFreeSpace){
                 if(e.getMemberID() == computeMemberID(getAddress(mRemoved.member().address()))){  //IS IT RIGHT?
                     membersFreeSpace.remove(e);
                 }
             }
             
-            System.out.println("----"+membersMap+"\n----"+membersFreeSpace);
+            System.out.println("----"+membersMap+"\n----"+membersFreeSpace);*/
             
         //message sent when the new member arrives in the cluster. The map has to be immediately filled with the current state
         } else if (message instanceof CurrentClusterState) {
             CurrentClusterState state = (CurrentClusterState) message;
             for (Member member : state.getMembers()) {
                 if (member.status().equals(MemberStatus.up())) {
-                    membersMap.put(computeMemberID(member.address().hostPort()),member);
+                    membersMap.newMember(computeMemberID(member.address().hostPort()),member);
+                    System.out.println("+"+membersMap.memberList);
                 }
             }
             
         } else if (message instanceof FreeSpaceSpread){
+            System.out.println("*FreeSpaceSpread context");
             //insert the received information about the free space in the current priority queue.
             FreeSpaceSpread receivedFreeSpace = (FreeSpaceSpread) message;
-            membersFreeSpace.add(new FreeSpaceElement(computeMemberID(getAddress(getSender().path().address())),receivedFreeSpace.getFreeByteSpace()));  //IS IT RIGHT?
-            System.out.println(getAddress(getSender().path().address())+"told me "+receivedFreeSpace.getFreeByteSpace());
-            log.info("Free Space Infos: {}",membersFreeSpace);
+            System.out.println(getSelf() + " " + getSender());
+            membersFreeSpace.newMember(computeMemberID(getAddress(getSender().path().address())), receivedFreeSpace.getFreeByteSpace());  //IS IT RIGHT?
+            System.out.println("+"+membersFreeSpace.freeSpace);
+            System.out.println("**"+getAddress(getSender().path().address())+" told me "+receivedFreeSpace.getFreeByteSpace());
+            //log.info("Free Space Infos: {}",membersFreeSpace);
 
         } else if (message instanceof MemberEvent) {
             // ignore
