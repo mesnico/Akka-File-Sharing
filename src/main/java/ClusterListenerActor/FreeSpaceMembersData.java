@@ -6,6 +6,7 @@
 package ClusterListenerActor;
 
 import akka.cluster.Member;
+import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.Comparator;
 import java.util.PriorityQueue;
@@ -14,6 +15,33 @@ import java.util.PriorityQueue;
  *
  * @author francescop
  */
+//class used to memorize freespace elements, built of memberID + freeSpace (in bytes)
+class FreeSpaceElement implements Serializable {
+    BigInteger memberID;
+    long freeByteSpace;
+    
+    public FreeSpaceElement(BigInteger memberID, long freeByteSpace){
+        this.memberID = memberID;
+        this.freeByteSpace = freeByteSpace;
+    }
+    
+    public BigInteger getMemberID(){
+        return memberID;
+    }
+    
+    public long getFreeByteSpace(){
+        return freeByteSpace;
+    }
+    public void setFreeByteSpace(long freeByteSpace) {
+        this.freeByteSpace = freeByteSpace;
+    }
+    
+    @Override
+    public String toString(){
+        return memberID+" has "+freeByteSpace+" bytes free";
+    }
+}
+
 public class FreeSpaceMembersData {
     
     private PriorityQueue<FreeSpaceElement> freeSpace;
