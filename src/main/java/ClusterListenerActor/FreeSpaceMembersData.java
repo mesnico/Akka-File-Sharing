@@ -5,7 +5,6 @@
  */
 package ClusterListenerActor;
 
-import akka.cluster.Member;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.Comparator;
