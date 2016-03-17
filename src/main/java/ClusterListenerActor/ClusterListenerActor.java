@@ -34,6 +34,7 @@ public class ClusterListenerActor extends UntypedActor {
     Cluster cluster = Cluster.get(getContext().system());
     HashMembersData membersMap;
     FreeSpaceMembersData membersFreeSpace;
+    FileInfoDistributedTable infoTable;
     String localAddress;
     
     int clusterPort, clientPort;
@@ -51,6 +52,7 @@ public class ClusterListenerActor extends UntypedActor {
         //construct the members map and member free space map
         membersMap = new HashMembersData();
         membersFreeSpace = new FreeSpaceMembersData();
+        infoTable = new FileInfoDistributedTable();
     }
 
     //subscribe to cluster changes
@@ -75,7 +77,7 @@ public class ClusterListenerActor extends UntypedActor {
             log.info("{} -->Member is Up: {}", localAddress, getAddress(mMemberUp.member().address()));
 
             //inserts the new member in the map
-            membersMap.newMember(computeMemberID(getAddress(mMemberUp.member().address())), mMemberUp.member());    //IS IT RIGHT?
+            membersMap.newMember(computeId(getAddress(mMemberUp.member().address())), mMemberUp.member());    //IS IT RIGHT?
             log.info("new Member inserted in membersMap: {}",mMemberUp.member());
             log.debug("Current membersMap status: {} ",membersMap);
            
@@ -98,7 +100,7 @@ public class ClusterListenerActor extends UntypedActor {
             }
             
             //in any case, the member is removed from the local structure
-            Member removed = membersMap.deleteMemberById(computeMemberID(getAddress(mMemberRemoved.member().address())));
+            Member removed = membersMap.deleteMemberById(computeId(getAddress(mMemberRemoved.member().address())));
             if(removed == null){
                 log.error("Member {} does not exist in membersMap!!",mMemberRemoved.member());
             } else {
@@ -108,7 +110,7 @@ public class ClusterListenerActor extends UntypedActor {
             
             //the member is also removed from the free space queue
             //the only way is to search it by member address and to delete it.
-            boolean exists = membersFreeSpace.deleteByMember(computeMemberID(getAddress(mMemberRemoved.member().address())));
+            boolean exists = membersFreeSpace.deleteByMember(computeId(getAddress(mMemberRemoved.member().address())));
             if(!exists){
                 log.error("Member {} does not exist in membersFreeSpace!!",mMemberRemoved.member());
             } else {
@@ -120,7 +122,7 @@ public class ClusterListenerActor extends UntypedActor {
             CurrentClusterState state = (CurrentClusterState) message;
             for (Member member : state.getMembers()) {
                 if (member.status().equals(MemberStatus.up())) {
-                    membersMap.newMember(computeMemberID(member.address().hostPort()),member);
+                    membersMap.newMember(computeId(member.address().hostPort()),member);
                 }
             }
             log.info("membersMap initialized: {}",membersMap);
@@ -129,9 +131,13 @@ public class ClusterListenerActor extends UntypedActor {
             //insert the received information about the free space in the current priority queue.
             FreeSpaceSpread receivedFreeSpace = (FreeSpaceSpread) message;
             System.out.println(getSelf() + " " + getSender());
-            membersFreeSpace.newMember(computeMemberID(getAddress(getSender().path().address())), receivedFreeSpace.getFreeByteSpace());  //IS IT RIGHT?
+            membersFreeSpace.newMember(computeId(getAddress(getSender().path().address())), receivedFreeSpace.getFreeByteSpace());  //IS IT RIGHT?
             log.info("Added {} with {} bytes free",getAddress(getSender().path().address()),receivedFreeSpace.getFreeByteSpace());
             log.debug("Free space infos: {}",membersFreeSpace);
+
+        } else if (message instanceof NewFileCreation) {
+            //I have just created a new file. Distribute info among other nodes
+            
 
         } else if (message instanceof MemberEvent) {
             // ignore
@@ -142,11 +148,11 @@ public class ClusterListenerActor extends UntypedActor {
     }
 
     //compute the member ID starting from the member address using the hash function
-    private BigInteger computeMemberID(String memberAddress) {
+    private BigInteger computeId(String inString) {
         try {
             MessageDigest md = MessageDigest.getInstance("MD5");
             md.reset();
-            md.update(memberAddress.getBytes("UTF-8"));
+            md.update(inString.getBytes("UTF-8"));
             return new BigInteger(md.digest());
         } catch (NoSuchAlgorithmException e) {
             return BigInteger.ZERO;
