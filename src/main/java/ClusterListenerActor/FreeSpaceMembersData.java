@@ -59,6 +59,10 @@ public class FreeSpaceMembersData {
     public BigInteger getHighestFreeSpaceMember(){
         return freeSpace.peek().getMemberID();
     }
+    //return the highest free space
+    public long getHighestFreeSpace(){
+        return freeSpace.peek().getFreeByteSpace();
+    }
     //Find the entry corresponding to the member id passed as parameter
     public boolean deleteByMember(BigInteger memberId){
         for(FreeSpaceElement e : freeSpace)

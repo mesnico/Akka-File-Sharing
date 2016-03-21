@@ -7,6 +7,7 @@ package ClusterListenerActor;
 
 import akka.cluster.Member;
 import java.math.BigInteger;
+import java.util.Map.Entry;
 import java.util.TreeMap;
 
 /**
@@ -30,13 +31,35 @@ public class HashMembersData {
     }
     //Get Member for the least key greater than or equal to the given key
     //a.k.a. the responsible for that id
-    public Member getResponsibleById(BigInteger memberId){
-        return memberList.ceilingEntry(memberId).getValue();
+    public Member getResponsibleMemberById(BigInteger memberId){
+        Entry<BigInteger,Member> entry = memberList.ceilingEntry(memberId);
+        if(entry == null){
+            entry = memberList.firstEntry();
+        }
+        return entry.getValue();
     }
+    public BigInteger getResponsibleById(BigInteger memberId){
+        Entry<BigInteger,Member> entry = memberList.ceilingEntry(memberId);
+        if(entry == null){
+            entry = memberList.firstEntry();
+        }
+        return entry.getKey();
+    }
+    
     //Removes the mapping for this id from this TreeMap if present.
     public Member deleteMemberById(BigInteger memberId){
         return memberList.remove(memberId);
     }
+    
+    //returns predecessor id
+    public BigInteger getSuccessorById(BigInteger memberId){
+        Entry<BigInteger,Member> entry = memberList.higherEntry(memberId);
+        if(entry == null){
+            entry = memberList.firstEntry();
+        }
+        return entry.getKey();
+    }
+    
     
     @Override
     public String toString(){

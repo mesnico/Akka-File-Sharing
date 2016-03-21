@@ -13,15 +13,17 @@ import java.util.List;
  *
  * @author francescop
  */
-public class NewFileCreation implements Serializable{
+public class EndModify implements Serializable{
     String fileName;
     List<String> tags;
-    BigInteger ownerId;
+    long fileByteSize;
+    //BigInteger ownerId;
 
-    public NewFileCreation(String fileName, List<String> tags, BigInteger ownerId) {
+    public EndModify(String fileName, List<String> tags, long fileByteSize /*BigInteger ownerId*/) {
         this.fileName = fileName;
         this.tags = tags;
-        this.ownerId = ownerId;
+        this.fileByteSize = fileByteSize;
+        //this.ownerId = ownerId;
     }
 
     public String getFileName() {
@@ -32,8 +34,12 @@ public class NewFileCreation implements Serializable{
         return tags;
     }
 
-    public BigInteger getOwnerId() {
+    /*public BigInteger getOwnerId() {
         return ownerId;
+    }*/
+
+    public long getFileByteSize() {
+        return fileByteSize;
     }
     
 }
