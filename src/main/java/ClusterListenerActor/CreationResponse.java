@@ -5,11 +5,13 @@
  */
 package ClusterListenerActor;
 
+import java.io.Serializable;
+
 /**
  *
  * @author nicky
  */
-public class CreationResponse {
+public class CreationResponse implements Serializable{
     boolean success;
 
     public CreationResponse(boolean success) {

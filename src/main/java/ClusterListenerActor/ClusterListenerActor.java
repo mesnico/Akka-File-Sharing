@@ -13,11 +13,10 @@ import akka.cluster.Member;
 import akka.cluster.MemberStatus;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
-import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
+import scala.concurrent.duration.Duration;
 
 /*
  * To change this license header, choose License Headers in Project Properties.
@@ -62,6 +61,19 @@ public class ClusterListenerActor extends UntypedActor {
         cluster.subscribe(getSelf(), ClusterEvent.initialStateAsEvents(),
                 MemberEvent.class, UnreachableMember.class);
         //#subscribe
+        
+        //TO DELETEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEeeEEEEEEEEEEEEEEEEEEEEEEEEEe
+        getContext().system().scheduler().scheduleOnce(Duration.create(15000, TimeUnit.MILLISECONDS),
+            new Runnable() {
+                @Override
+                public void run() {
+                    Member responsibleMember = membersMap.getResponsibleMemberById(HashUtilities.computeId("prova"+clusterPort+".txt"));
+                    getContext().actorSelection(responsibleMember.address() + "/user/clusterListener")
+                        .tell(new CreationRequest("prova"+clusterPort+".txt"), getSelf());
+                }
+            }, getContext().system().dispatcher());
+
+
     }
 
     //re-subscribe when restart
@@ -77,23 +89,16 @@ public class ClusterListenerActor extends UntypedActor {
             log.info("{} -->Member is Up: {}", localAddress, getAddress(mMemberUp.member().address()));
 
             //inserts the new member in the map
-            membersMap.newMember(computeId(getAddress(mMemberUp.member().address())), mMemberUp.member());    //IS IT RIGHT?
+            membersMap.newMember(HashUtilities.computeId(getAddress(mMemberUp.member().address())), mMemberUp.member());    //IS IT RIGHT?
             log.info("new Member inserted in membersMap: {}",mMemberUp.member());
             log.debug("Current membersMap status: {} ",membersMap);
             
             //transfer control of the right tags to the new node, if it is my predecessor.
-            FileInfoTransfer fit = new FileInfoTransfer();
-            
             //if it is my predecessor
-            if(computeId(getAddress(getSelf().path().address())) == 
-                    membersMap.getSuccessorById(computeId(getAddress(mMemberUp.member().address())))){
+            if(HashUtilities.computeId(getAddress(getSelf().path().address())).compareTo(
+                    membersMap.getSuccessorById(HashUtilities.computeId(getAddress(mMemberUp.member().address()))))==0){
                 //collect the infoTable entries to be passed to the arrived node
-                for(String tag: infoTable.allTags()){
-                    if(membersMap.getResponsibleById(computeId(tag)) !=
-                            computeId(getAddress(getSelf().path().address()))){
-                        fit.addEntry(tag,infoTable.removeByTag(tag));
-                    }
-                }
+                FileInfoTransfer fit = infoTable.buildFileInfoTransfer(membersMap,HashUtilities.computeId(getAddress(getSelf().path().address()))); 
                 //send the infos to the new responsible
                 getContext().actorSelection(mMemberUp.member().address() + "/user/clusterListener")
                         .tell(fit, getSelf());
@@ -102,12 +107,6 @@ public class ClusterListenerActor extends UntypedActor {
             //send my free space to the new arrived member
             getContext().actorSelection(mMemberUp.member().address() + "/user/clusterListener")
                     .tell(new FreeSpaceSpread(myFreeSpace), getSelf());
-            
-            
-            //TO DELETEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEeeEEEEEEEEEEEEEEEEEEEEEEEEEe
-            Member responsibleMember = membersMap.getResponsibleMemberById(computeId("prova"+clusterPort+".txt"));
-            getContext().actorSelection(responsibleMember.address() + "/user/clusterListener")
-                    .tell(new CreationRequest("prova"+clusterPort+".txt"), getSelf());
 
         } else if (message instanceof UnreachableMember) {
             UnreachableMember mMemberUnreachable = (UnreachableMember) message;
@@ -124,7 +123,7 @@ public class ClusterListenerActor extends UntypedActor {
             }
             
             //in any case, the member is removed from the local structure
-            Member removed = membersMap.deleteMemberById(computeId(getAddress(mMemberRemoved.member().address())));
+            Member removed = membersMap.deleteMemberById(HashUtilities.computeId(getAddress(mMemberRemoved.member().address())));
             if(removed == null){
                 log.error("Member {} does not exist in membersMap!!",mMemberRemoved.member());
             } else {
@@ -134,7 +133,7 @@ public class ClusterListenerActor extends UntypedActor {
             
             //the member is also removed from the free space queue
             //the only way is to search it by member address and to delete it.
-            boolean exists = membersFreeSpace.deleteByMember(computeId(getAddress(mMemberRemoved.member().address())));
+            boolean exists = membersFreeSpace.deleteByMember(HashUtilities.computeId(getAddress(mMemberRemoved.member().address())));
             if(!exists){
                 log.error("Member {} does not exist in membersFreeSpace!!",mMemberRemoved.member());
             } else {
@@ -146,7 +145,7 @@ public class ClusterListenerActor extends UntypedActor {
             CurrentClusterState state = (CurrentClusterState) message;
             for (Member member : state.getMembers()) {
                 if (member.status().equals(MemberStatus.up())) {
-                    membersMap.newMember(computeId(member.address().hostPort()),member);
+                    membersMap.newMember(HashUtilities.computeId(member.address().hostPort()),member);
                 }
             }
             log.info("membersMap initialized: {}",membersMap);
@@ -155,7 +154,7 @@ public class ClusterListenerActor extends UntypedActor {
             //insert the received information about the free space in the current priority queue.
             FreeSpaceSpread receivedFreeSpace = (FreeSpaceSpread) message;
             System.out.println(getSelf() + " " + getSender());
-            membersFreeSpace.newMember(computeId(getAddress(getSender().path().address())), receivedFreeSpace.getFreeByteSpace());  //IS IT RIGHT?
+            membersFreeSpace.newMember(HashUtilities.computeId(getAddress(getSender().path().address())), receivedFreeSpace.getFreeByteSpace());  //IS IT RIGHT?
             log.info("Added {} with {} bytes free",getAddress(getSender().path().address()),receivedFreeSpace.getFreeByteSpace());
             log.debug("Free space infos: {}",membersFreeSpace);
 
@@ -172,7 +171,7 @@ public class ClusterListenerActor extends UntypedActor {
 
                 //Distribute info among other nodes
                 for(String tag : mNewFileCreation.getTags()){
-                    Member responsible = membersMap.getResponsibleMemberById(computeId(tag));
+                    Member responsible = membersMap.getResponsibleMemberById(HashUtilities.computeId(tag));
                     getContext().actorSelection(responsible.address() + "/user/clusterListener")
                         .tell(new AddTag(tag,mNewFileCreation.getFileName(),ownerId), getSelf());
                 }
@@ -181,7 +180,7 @@ public class ClusterListenerActor extends UntypedActor {
 
                 //Also the file name information has to be stored as like as happens for other tags
                 String fileName = mNewFileCreation.getFileName();
-                Member responsible = membersMap.getResponsibleById(computeId(fileName));
+                Member responsible = membersMap.getResponsibleById(HashUtilities.computeId(fileName));
                     getContext().actorSelection(responsible.address() + "/user/clusterListener")
                         .tell(new AddTag(fileName,mNewFileCreation.getFileName(),mNewFileCreation.getOwnerId()), getSelf());
                 */
@@ -190,10 +189,10 @@ public class ClusterListenerActor extends UntypedActor {
         } else if (message instanceof CreationRequest){
             //i am the responsible for the new filename tag. I have to add it to my FileInfoDistributedTable, only if it does not exist yet.
             String fileName = ((CreationRequest)message).getFileName();
-            boolean success = infoTable.testAndSet(fileName, fileName, computeId(getAddress(getSender().path().address())));
+            boolean success = infoTable.testAndSet(fileName, fileName, HashUtilities.computeId(getAddress(getSender().path().address())));
             //getSender().tell(new CreationResponse(success), getSelf());
             log.debug("Received a creation request. \n Success:{}\nCurrent info table is: {}",success,infoTable.toString());
-            log.debug("tag id: {}",computeId(fileName));
+            log.debug("tag id: {}",HashUtilities.computeId(fileName));
         } else if (message instanceof AddTag) {
             //Receved a information for wich I'm the responsible
             AddTag mAddTag = (AddTag) message;
@@ -203,27 +202,13 @@ public class ClusterListenerActor extends UntypedActor {
             FileInfoTransfer infos = (FileInfoTransfer)message;
             
             //merge the arrived file informations into the local structure
-            infoTable.mergeInfos(infos.getInfos());
+            infoTable.mergeInfos(infos);
             log.debug("Received Infos: {}",infos.getInfos().toString());
         } else if (message instanceof MemberEvent) {
             // ignore
 
         } else {
             unhandled(message);
-        }
-    }
-
-    //compute the member ID starting from the member address using the hash function
-    private BigInteger computeId(String inString) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            md.reset();
-            md.update(inString.getBytes("UTF-8"));
-            return new BigInteger(md.digest());
-        } catch (NoSuchAlgorithmException e) {
-            return BigInteger.ZERO;
-        } catch (UnsupportedEncodingException e) {
-            return BigInteger.ZERO;
         }
     }
     

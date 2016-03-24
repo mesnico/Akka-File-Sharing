@@ -5,8 +5,10 @@
  */
 package ClusterListenerActor;
 
+import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
@@ -16,7 +18,7 @@ import java.util.Set;
  *
  * @author nicky
  */
-class FileInfoElement{
+class FileInfoElement implements Serializable{
     String fileName;
     BigInteger ownerId;
     
@@ -102,8 +104,28 @@ public class FileInfoDistributedTable {
         return false;        
     }
     
-    public void mergeInfos(HashMap<String,List<FileInfoElement>> newInfos){
-        fileInfo.putAll(newInfos);
+    //construct the FileInfoTransfer for current node id. Tags resident on that node,infact, must be transferred.
+    FileInfoTransfer buildFileInfoTransfer(HashMembersData membersMap, BigInteger nodeId){
+        //WRONG CODEEEE
+        /*for(String tag: infoTable.allTags()){
+            if(membersMap.getResponsibleById(computeId(tag)) !=
+                computeId(getAddress(getSelf().path().address()))){
+                fit.addEntry(tag,infoTable.removeByTag(tag));
+            }
+        }*/
+        FileInfoTransfer fit = new FileInfoTransfer();
+        for(Iterator<HashMap.Entry<String,List<FileInfoElement>>>it=fileInfo.entrySet().iterator();it.hasNext();){
+            HashMap.Entry<String, List<FileInfoElement>> entry = it.next();
+            if(membersMap.getResponsibleById(HashUtilities.computeId(entry.getKey())) != nodeId){
+                fit.addEntry(entry.getKey(), entry.getValue());
+                it.remove();
+            }
+        }
+        return fit;
+    }
+    
+    public void mergeInfos(FileInfoTransfer fit){
+        fileInfo.putAll(fit.getInfos());
     }
     
     public List<FileInfoElement> getByTag(String tag){
