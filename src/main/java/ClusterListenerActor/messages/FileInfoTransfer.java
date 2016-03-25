@@ -3,8 +3,9 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package ClusterListenerActor;
+package ClusterListenerActor.messages;
 
+import ClusterListenerActor.FileInfoElement;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
@@ -27,6 +28,11 @@ public class FileInfoTransfer implements Serializable{
     
     public HashMap<String,List<FileInfoElement>> getInfos(){
         return info;
+    }
+    
+    @Override
+    public String toString(){
+        return info.toString();
     }
     
 }

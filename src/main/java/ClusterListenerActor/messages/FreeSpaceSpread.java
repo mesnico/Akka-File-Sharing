@@ -1,4 +1,4 @@
-package ClusterListenerActor;
+package ClusterListenerActor.messages;
 
 
 import java.io.Serializable;

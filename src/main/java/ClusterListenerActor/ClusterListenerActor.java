@@ -1,5 +1,12 @@
 package ClusterListenerActor;
 
+import ClusterListenerActor.messages.EndModify;
+import ClusterListenerActor.messages.FileInfoTransfer;
+import ClusterListenerActor.messages.Quit;
+import ClusterListenerActor.messages.FreeSpaceSpread;
+import ClusterListenerActor.messages.CreationRequest;
+import ClusterListenerActor.messages.AddTag;
+import ClusterListenerActor.messages.CreationResponse;
 import akka.actor.Address;
 import akka.actor.UntypedActor;
 import akka.cluster.Cluster;
@@ -63,6 +70,7 @@ public class ClusterListenerActor extends UntypedActor {
         //#subscribe
         
         //TO DELETEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEeeEEEEEEEEEEEEEEEEEEEEEEEEEe
+        //after 15 seconds the actor creates a new file
         getContext().system().scheduler().scheduleOnce(Duration.create(15000, TimeUnit.MILLISECONDS),
             new Runnable() {
                 @Override
@@ -70,6 +78,15 @@ public class ClusterListenerActor extends UntypedActor {
                     Member responsibleMember = membersMap.getResponsibleMemberById(HashUtilities.computeId("prova"+clusterPort+".txt"));
                     getContext().actorSelection(responsibleMember.address() + "/user/clusterListener")
                         .tell(new CreationRequest("prova"+clusterPort+".txt"), getSelf());
+                }
+            }, getContext().system().dispatcher());
+        
+        //after 80 seconds the actor shutdown
+        getContext().system().scheduler().scheduleOnce(Duration.create(80000, TimeUnit.MILLISECONDS),
+            new Runnable() {
+                @Override
+                public void run() {
+                        getSelf().tell(new Quit(), getSelf());
                 }
             }, getContext().system().dispatcher());
 
@@ -102,6 +119,7 @@ public class ClusterListenerActor extends UntypedActor {
                 //send the infos to the new responsible
                 getContext().actorSelection(mMemberUp.member().address() + "/user/clusterListener")
                         .tell(fit, getSelf());
+                log.debug("Sending out file info: {}",fit.toString());
             }
            
             //send my free space to the new arrived member
@@ -190,7 +208,8 @@ public class ClusterListenerActor extends UntypedActor {
             //i am the responsible for the new filename tag. I have to add it to my FileInfoDistributedTable, only if it does not exist yet.
             String fileName = ((CreationRequest)message).getFileName();
             boolean success = infoTable.testAndSet(fileName, fileName, HashUtilities.computeId(getAddress(getSender().path().address())));
-            //getSender().tell(new CreationResponse(success), getSelf());
+            getSender().tell(new CreationResponse(success), getSelf());
+            
             log.debug("Received a creation request. \n Success:{}\nCurrent info table is: {}",success,infoTable.toString());
             log.debug("tag id: {}",HashUtilities.computeId(fileName));
         } else if (message instanceof AddTag) {
@@ -203,7 +222,26 @@ public class ClusterListenerActor extends UntypedActor {
             
             //merge the arrived file informations into the local structure
             infoTable.mergeInfos(infos);
-            log.debug("Received Infos: {}",infos.getInfos().toString());
+            log.info("Received File Infos: {}",infos.toString());
+            log.debug("Current File Info Table: {}",infoTable.toString());
+            
+        } else if (message instanceof Quit) {
+            log.info("The system is going to shutdown!");
+            //transfer all my infos to my successor node
+            Member newInfoResponsable = membersMap.getSuccessorMemberById(
+                    HashUtilities.computeId(getAddress(getSelf().path().address())));
+            //prepare the fileinfo transfer message
+            FileInfoTransfer fit = infoTable.buildFileInfoTransfer(membersMap,
+                    HashUtilities.computeId(getAddress(newInfoResponsable.address())));
+            //send the infos to the new responsible
+            getContext().actorSelection(newInfoResponsable.address() + "/user/clusterListener")
+                    .tell(fit, getSelf());
+            
+            //leave the cluster and stop the system
+            cluster.leave(cluster.selfAddress());
+            getContext().stop(getSelf());
+            getContext().system().terminate();
+            
         } else if (message instanceof MemberEvent) {
             // ignore
 

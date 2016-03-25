@@ -5,45 +5,18 @@
  */
 package ClusterListenerActor;
 
-import java.io.Serializable;
+import ClusterListenerActor.messages.FileInfoTransfer;
 import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map.Entry;
 import java.util.Set;
 
 /**
  *
  * @author nicky
  */
-class FileInfoElement implements Serializable{
-    String fileName;
-    BigInteger ownerId;
-    
-    public FileInfoElement(String fileName, BigInteger ownerId) {
-        this.fileName = fileName;
-        this.ownerId = ownerId;
-    }
-    
-    public String getFileName() {
-        return fileName;
-    }
-
-    public BigInteger getOwnerId() {
-        return ownerId;
-    }
-
-    public void setOwnerId(BigInteger ownerId) {
-        this.ownerId = ownerId;
-    }
-    
-    @Override
-    public String toString(){
-        return "fileName: "+fileName+"; ownerId: "+ownerId;
-    }
-}
 
 public class FileInfoDistributedTable {
     HashMap<String,List<FileInfoElement>> fileInfo;
@@ -116,7 +89,7 @@ public class FileInfoDistributedTable {
         FileInfoTransfer fit = new FileInfoTransfer();
         for(Iterator<HashMap.Entry<String,List<FileInfoElement>>>it=fileInfo.entrySet().iterator();it.hasNext();){
             HashMap.Entry<String, List<FileInfoElement>> entry = it.next();
-            if(membersMap.getResponsibleById(HashUtilities.computeId(entry.getKey())) != nodeId){
+            if(membersMap.getResponsibleById(HashUtilities.computeId(entry.getKey())).compareTo(nodeId)!=0){
                 fit.addEntry(entry.getKey(), entry.getValue());
                 it.remove();
             }

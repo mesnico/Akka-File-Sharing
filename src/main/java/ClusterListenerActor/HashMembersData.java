@@ -60,6 +60,13 @@ public class HashMembersData {
         return entry.getKey();
     }
     
+    public Member getSuccessorMemberById(BigInteger memberId){
+        Entry<BigInteger,Member> entry = memberList.higherEntry(memberId);
+        if(entry == null){
+            entry = memberList.firstEntry();
+        }
+        return entry.getValue();
+    }
     
     @Override
     public String toString(){
