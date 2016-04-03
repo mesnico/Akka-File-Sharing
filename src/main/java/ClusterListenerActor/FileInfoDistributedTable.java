@@ -42,7 +42,7 @@ public class FileInfoDistributedTable {
         return null;
     }
     
-    public List<FileInfoElement> removeByTag(String tag){
+    /*public List<FileInfoElement> removeByTag(String tag){
         return fileInfo.remove(tag);
     }
     
@@ -51,7 +51,7 @@ public class FileInfoDistributedTable {
         if(toDelete == null) 
             return false;
         return fileInfo.get(tag).remove(toDelete);
-    }
+    }*/
     
     /*if the tag exists, update it; otherwise, create it.
     This method returns true if the tag was found; if the tag was created because it wasn't present, returns false.
