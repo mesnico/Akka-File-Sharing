@@ -1,12 +1,13 @@
 package ClusterListenerActor;
 
+import ClusterListenerActor.messages.InitiateShutdown;
 import ClusterListenerActor.messages.EndModify;
 import ClusterListenerActor.messages.FileInfoTransfer;
-import ClusterListenerActor.messages.Quit;
 import ClusterListenerActor.messages.FreeSpaceSpread;
 import ClusterListenerActor.messages.CreationRequest;
 import ClusterListenerActor.messages.AddTag;
 import ClusterListenerActor.messages.CreationResponse;
+import ClusterListenerActor.messages.Shutdown;
 import akka.actor.Address;
 import akka.actor.UntypedActor;
 import akka.cluster.Cluster;
@@ -43,13 +44,12 @@ public class ClusterListenerActor extends UntypedActor {
     FileInfoDistributedTable infoTable;
     String localAddress;
     
-    int clusterPort, clientPort;
+    int clusterSystemPort;
     final long myFreeSpace = new Random().nextLong();    //THIS IS GENERATED INTERNALLY BUT IT SHOULD NOT (should be taken from mine file table)
     
-    public ClusterListenerActor(int clusterPort){
+    public ClusterListenerActor(int basePort){
         //cluster port is that specified from the user; instead the client port (for handling of the files) is opened in clusterPort + 1
-        this.clusterPort = clusterPort;
-        this.clientPort = clusterPort + 1;
+        this.clusterSystemPort = basePort;
         
         //transforms the local reference to remote reference to uniformate hash accesses in case of remote actor
         Address mineAddress = getSelf().path().address();
@@ -75,21 +75,21 @@ public class ClusterListenerActor extends UntypedActor {
             new Runnable() {
                 @Override
                 public void run() {
-                    Member responsibleMember = membersMap.getResponsibleMemberById(HashUtilities.computeId("prova"+clusterPort+".txt"));
+                    Member responsibleMember = membersMap.getResponsibleMemberById(HashUtilities.computeId("prova"+clusterSystemPort+".txt"));
                     getContext().actorSelection(responsibleMember.address() + "/user/clusterListener")
-                        .tell(new CreationRequest("prova"+clusterPort+".txt"), getSelf());
+                        .tell(new CreationRequest("prova"+clusterSystemPort+".txt"), getSelf());
                 }
             }, getContext().system().dispatcher());
         
-        //after 80 seconds the actor shutdown
-        getContext().system().scheduler().scheduleOnce(Duration.create(80000, TimeUnit.MILLISECONDS),
+        //after 20 seconds the actor shutdown
+        /*getContext().system().scheduler().scheduleOnce(Duration.create(20000, TimeUnit.MILLISECONDS),
             new Runnable() {
                 @Override
                 public void run() {
-                        getSelf().tell(new Quit(), getSelf());
+                        getSelf().tell(new ClusterShutdown(), getSelf());
                 }
             }, getContext().system().dispatcher());
-
+        */
 
     }
 
@@ -225,7 +225,7 @@ public class ClusterListenerActor extends UntypedActor {
             log.info("Received File Infos: {}",infos.toString());
             log.debug("Current File Info Table: {}",infoTable.toString());
             
-        } else if (message instanceof Quit) {
+        } else if (message instanceof InitiateShutdown) {
             log.info("The system is going to shutdown!");
             //transfer all my infos to my successor node
             Member newInfoResponsable = membersMap.getSuccessorMemberById(
@@ -237,6 +237,9 @@ public class ClusterListenerActor extends UntypedActor {
             getContext().actorSelection(newInfoResponsable.address() + "/user/clusterListener")
                     .tell(fit, getSelf());
             
+            getSelf().tell(new Shutdown(), getSelf());
+        
+        } else if (message instanceof Shutdown){
             //leave the cluster and stop the system
             cluster.leave(cluster.selfAddress());
             getContext().stop(getSelf());
@@ -252,6 +255,6 @@ public class ClusterListenerActor extends UntypedActor {
     
     //returns a string containing the remote address
     private String getAddress(Address address){
-        return (address.hasLocalScope()) ? address.hostPort()+"@127.0.0.1:"+clusterPort : address.hostPort();
+        return (address.hasLocalScope()) ? address.hostPort()+"@127.0.0.1:"+clusterSystemPort : address.hostPort();
     }
 }
