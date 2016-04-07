@@ -1,3 +1,5 @@
+package Startup;
+
 
 import ClusterListenerActor.ClusterListenerActor;
 import akka.actor.ActorSystem;
@@ -46,7 +48,10 @@ public class Main {
         // Create an Akka system
         ActorSystem clusterSystem = ActorSystem.create("ClusterSystem", clusterConf);
         //ActorSystem localSystem = ActorSystem.create("LocalSystem", localConf);
-
+        
+        //create the Soul Reaper actor to watch out all the others
+        clusterSystem.actorOf(Props.create(SoulReaper.class), "soulReaper");
+            
         // Create an actor that handles cluster domain events
         clusterSystem.actorOf(Props.create(ClusterListenerActor.class, basePort),"clusterListener");
         clusterSystem.actorOf(Props.create(GuiActor.class,basePort).withDispatcher("javafx-dispatcher"), "gui");

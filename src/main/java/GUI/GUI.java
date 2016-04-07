@@ -1,5 +1,6 @@
 package GUI;
 
+import akka.actor.PoisonPill;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -23,8 +24,11 @@ public class GUI extends Application {
         stage.setScene(scene);
         stage.show();
         stage.setOnCloseRequest((WindowEvent we) -> {
-            //send shutdown signal to the actor system, that must initiate shutdown procedure
+            //tell the cluster system to initiate the shutdown
             GuiActor.getClusterListenerActorRef().tell(new ClusterListenerActor.messages.InitiateShutdown(), GuiActor.getGuiActorRef());
+            
+            //send Poison Pill to me to kill myself
+            GuiActor.getGuiActorRef().tell(PoisonPill.getInstance(), GuiActor.getGuiActorRef());
         });
         
     }

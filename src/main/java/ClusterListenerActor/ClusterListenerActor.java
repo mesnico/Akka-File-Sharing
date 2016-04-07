@@ -8,7 +8,9 @@ import ClusterListenerActor.messages.CreationRequest;
 import ClusterListenerActor.messages.AddTag;
 import ClusterListenerActor.messages.CreationResponse;
 import ClusterListenerActor.messages.Shutdown;
+import Startup.WatchMe;
 import akka.actor.Address;
+import akka.actor.PoisonPill;
 import akka.actor.UntypedActor;
 import akka.cluster.Cluster;
 import akka.cluster.ClusterEvent;
@@ -68,6 +70,10 @@ public class ClusterListenerActor extends UntypedActor {
         cluster.subscribe(getSelf(), ClusterEvent.initialStateAsEvents(),
                 MemberEvent.class, UnreachableMember.class);
         //#subscribe
+        
+        //subscrive to to the soul reaper
+        getContext().actorSelection("akka.tcp://ClusterSystem@127.0.0.1:"+clusterSystemPort+"/user/soulReaper")
+                .tell(new WatchMe(), getSelf());
         
         //TO DELETEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEeeEEEEEEEEEEEEEEEEEEEEEEEEEe
         //after 15 seconds the actor creates a new file
@@ -242,8 +248,9 @@ public class ClusterListenerActor extends UntypedActor {
         } else if (message instanceof Shutdown){
             //leave the cluster and stop the system
             cluster.leave(cluster.selfAddress());
-            getContext().stop(getSelf());
-            getContext().system().terminate();
+            
+            //send Poison Pill to me to kill myself
+            getSelf().tell(PoisonPill.getInstance(), getSelf());
             
         } else if (message instanceof MemberEvent) {
             // ignore

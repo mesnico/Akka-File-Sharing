@@ -6,6 +6,7 @@
 package GUI;
 
 import GUI.messages.MyGUIMessage;
+import Startup.WatchMe;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
 import akka.actor.UntypedActor;
@@ -30,6 +31,10 @@ public class GuiActor extends UntypedActor{
     public void preStart(){
         guiActorRef = getSelf();
         clusterListenerActorRef = getContext().actorSelection("akka.tcp://ClusterSystem@127.0.0.1:"+clusterSystemPort+"/user/clusterListener");
+        
+        //subscrive to to the soul reaper
+        getContext().actorSelection("akka.tcp://ClusterSystem@127.0.0.1:"+clusterSystemPort+"/user/soulReaper")
+                .tell(new WatchMe(), getSelf());
     }
     
     @Override
