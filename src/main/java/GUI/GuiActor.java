@@ -6,6 +6,7 @@
 package GUI;
 
 import GUI.messages.MyGUIMessage;
+import Startup.AddressResolver;
 import Startup.WatchMe;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
@@ -28,17 +29,17 @@ public class GuiActor extends UntypedActor{
     }
     
     @Override 
-    public void preStart(){
+    public void preStart() throws Exception{
         guiActorRef = getSelf();
-        clusterListenerActorRef = getContext().actorSelection("akka.tcp://ClusterSystem@127.0.0.1:"+clusterSystemPort+"/user/clusterListener");
+        clusterListenerActorRef = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"+clusterSystemPort+"/user/clusterListener");
         
         //subscrive to to the soul reaper
-        getContext().actorSelection("akka.tcp://ClusterSystem@127.0.0.1:"+clusterSystemPort+"/user/soulReaper")
+        getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"+clusterSystemPort+"/user/soulReaper")
                 .tell(new WatchMe(), getSelf());
     }
     
     @Override
-    public void onReceive(Object message){
+    public void onReceive(Object message) throws Exception{
         if(message instanceof MyGUIMessage){
             System.out.println("Received message from controller; setting textbox message");
             FXMLMainController.addEntry(((MyGUIMessage) message).getMessage());

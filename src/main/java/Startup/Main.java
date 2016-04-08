@@ -8,6 +8,7 @@ import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import javafx.application.Application;
 import GUI.*;
+import java.net.UnknownHostException;
 
 /*
  * To change this license header, choose License Headers in Project Properties.
@@ -21,13 +22,17 @@ import GUI.*;
  */
 public class Main {
     public static void main(String[] args) {
-        if (args.length == 0)
-            startup("2551");
-        else
-            startup(args[0]);
+        try{
+            if (args.length == 0)
+                startup("2551");
+            else
+                startup(args[0]);
+        } catch(UnknownHostException e){
+            System.err.println("Error initializing IP address. Do you have one?");
+        }
     }
 
-    public static void startup(String strPort) {
+    public static void startup(String strPort) throws UnknownHostException{
         int basePort = Integer.parseInt(strPort);
         
         //creates the GUI
@@ -40,7 +45,10 @@ public class Main {
         }.start();
         
         // Override the configuration of the port
-        Config clusterConf = ConfigFactory.parseString("akka.remote.netty.tcp.port=" + basePort).withFallback(
+        Config clusterConf = ConfigFactory
+                .parseString("akka.remote.netty.tcp.port=" + basePort + System.lineSeparator()
+                             +"akka.remote.netty.tcp.hostname=" + AddressResolver.getMyIpAddress())
+                .withFallback(
                         ConfigFactory.load());
         //Config localConf = ConfigFactory.parseString("akka.remote.netty.tcp.port=" + (basePort+1)).withFallback(
         //                ConfigFactory.load("local.conf"));

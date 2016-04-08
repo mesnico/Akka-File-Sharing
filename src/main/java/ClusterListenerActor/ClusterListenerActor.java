@@ -8,6 +8,7 @@ import ClusterListenerActor.messages.CreationRequest;
 import ClusterListenerActor.messages.AddTag;
 import ClusterListenerActor.messages.CreationResponse;
 import ClusterListenerActor.messages.Shutdown;
+import Startup.AddressResolver;
 import Startup.WatchMe;
 import akka.actor.Address;
 import akka.actor.PoisonPill;
@@ -24,6 +25,7 @@ import akka.cluster.MemberStatus;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import java.math.BigInteger;
+import java.net.UnknownHostException;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import scala.concurrent.duration.Duration;
@@ -49,7 +51,7 @@ public class ClusterListenerActor extends UntypedActor {
     int clusterSystemPort;
     final long myFreeSpace = new Random().nextLong();    //THIS IS GENERATED INTERNALLY BUT IT SHOULD NOT (should be taken from mine file table)
     
-    public ClusterListenerActor(int basePort){
+    public ClusterListenerActor(int basePort) throws Exception{
         //cluster port is that specified from the user; instead the client port (for handling of the files) is opened in clusterPort + 1
         this.clusterSystemPort = basePort;
         
@@ -65,14 +67,14 @@ public class ClusterListenerActor extends UntypedActor {
 
     //subscribe to cluster changes
     @Override
-    public void preStart() {
+    public void preStart() throws Exception{
         //#subscribe
         cluster.subscribe(getSelf(), ClusterEvent.initialStateAsEvents(),
                 MemberEvent.class, UnreachableMember.class);
         //#subscribe
         
         //subscrive to to the soul reaper
-        getContext().actorSelection("akka.tcp://ClusterSystem@127.0.0.1:"+clusterSystemPort+"/user/soulReaper")
+        getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"+clusterSystemPort+"/user/soulReaper")
                 .tell(new WatchMe(), getSelf());
         
         //TO DELETEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEeeEEEEEEEEEEEEEEEEEEEEEEEEEe
@@ -106,7 +108,7 @@ public class ClusterListenerActor extends UntypedActor {
     }
 
     @Override
-    public void onReceive(Object message) {
+    public void onReceive(Object message) throws Exception{
         if (message instanceof MemberUp) {
             MemberUp mMemberUp = (MemberUp) message;
             log.info("{} -->Member is Up: {}", localAddress, getAddress(mMemberUp.member().address()));
@@ -261,7 +263,7 @@ public class ClusterListenerActor extends UntypedActor {
     }
     
     //returns a string containing the remote address
-    private String getAddress(Address address){
-        return (address.hasLocalScope()) ? address.hostPort()+"@127.0.0.1:"+clusterSystemPort : address.hostPort();
+    private String getAddress(Address address) throws UnknownHostException{
+        return (address.hasLocalScope()) ? address.hostPort()+"@"+AddressResolver.getMyIpAddress()+":"+clusterSystemPort : address.hostPort();
     }
 }
