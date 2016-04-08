@@ -23,6 +23,8 @@ public class GUI extends Application {
         stage.setTitle("JavaFX and Maven");
         stage.setScene(scene);
         stage.show();
+        
+        //at the event "close window"
         stage.setOnCloseRequest((WindowEvent we) -> {
             //tell the cluster system to initiate the shutdown
             GuiActor.getClusterListenerActorRef().tell(new ClusterListenerActor.messages.InitiateShutdown(), GuiActor.getGuiActorRef());

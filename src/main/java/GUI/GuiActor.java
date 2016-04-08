@@ -22,7 +22,7 @@ public class GuiActor extends UntypedActor{
     LoggingAdapter log = Logging.getLogger(getContext().system(), this);
     private static ActorRef guiActorRef;
     private static ActorSelection clusterListenerActorRef;
-    private int clusterSystemPort;
+    private final int clusterSystemPort;
     
     public GuiActor(int basePort){
         this.clusterSystemPort = basePort;
@@ -40,10 +40,10 @@ public class GuiActor extends UntypedActor{
     
     @Override
     public void onReceive(Object message) throws Exception{
-        if(message instanceof MyGUIMessage){
+        /*if(message instanceof MyGUIMessage){
             System.out.println("Received message from controller; setting textbox message");
             FXMLMainController.addEntry(((MyGUIMessage) message).getMessage());
-        }
+        }*/
     }
 
     public static ActorRef getGuiActorRef() {
