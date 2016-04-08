@@ -35,61 +35,53 @@ public class FXMLMainController implements Initializable {
         return secondaryStage;
     }
     
+    private void createStage(String FXMLFileName, boolean disableButtons){
+        try {
+            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/fxml/"+FXMLFileName+".fxml"));
+            Parent root = (Parent) fxmlLoader.load();
+            Stage stage = new Stage();
+            stage.setScene(new Scene(root));
+            stage.setTitle(FXMLFileName);
+            if(disableButtons){
+                //remove "minimize" and "restore down" buttons
+                stage.initStyle(StageStyle.UTILITY);
+                //disable close button
+                stage.setOnCloseRequest((final WindowEvent windowEvent) -> { windowEvent.consume(); });
+            }
+            setSecondaryStage(stage);
+            getSecondaryStage().show();
+            GUI.getStage().hide();
+            //((Stage) label.getScene().getWindow()).hide();
+        } catch(Exception ex) {
+            System.out.println(ex.getMessage());
+            System.out.println(ex.getCause().toString());
+        }
+    }
+    
     @FXML
     private void modify(ActionEvent event) {
         System.out.println("You clicked Modify!");
-        FileEntry row = table.getSelectionModel().getSelectedItem();
         //require the file
         /*
+        //get the selected entry of the TableView
+        FileEntry row = table.getSelectionModel().getSelectedItem();
+        //create a request of the file selected
         ReadFile message = new ReadFile(row);//filter is a function that help to check the correctness of the search
+        //send the request to the clusterListener
         GuiActor.controllerActorRef.tell(message, GuiActor.guiActorRef);
         */
         //receive it if not busy
         
         //this has to be done in another message...
-        try {
-            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/fxml/Modify.fxml"));
-            Parent root = (Parent) fxmlLoader.load();
-            Stage stage = new Stage();
-            stage.setScene(new Scene(root));
-            stage.setTitle("File under modify");
-            
-            //remove "minimize" and "restore down" buttons
-            stage.initStyle(StageStyle.UTILITY);
-            //disable close button
-            stage.setOnCloseRequest((final WindowEvent windowEvent) -> { windowEvent.consume(); });
-            
-            setSecondaryStage(stage);
-            getSecondaryStage().show();
-            GUI.getStage().hide();
-            //((Stage) label.getScene().getWindow()).hide();
-        } catch(Exception ex) {}
+        createStage("Modify",true);
     }
+    
     @FXML
     private void create(ActionEvent event) {
         System.out.println("You clicked Create new file!");
         //label.setText("New file");
-        try {
-            System.out.println("1");
-            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/fxml/Create.fxml"));
-            System.out.println("1");
-            Parent root = (Parent) fxmlLoader.load();
-            System.out.println("1");
-            Stage stage = new Stage();
-            System.out.println("1");
-            stage.setScene(new Scene(root));
-            System.out.println("1");
-            stage.setTitle("Create new file");
-            System.out.println("1");
-            
-            setSecondaryStage(stage);
-            System.out.println("2");
-            getSecondaryStage().show();
-            System.out.println("3");
-            GUI.getStage().hide();
-            System.out.println("4");
-            //((Stage) label.getScene().getWindow()).hide();
-        } catch(Exception ex) {System.out.println(ex.getMessage());}
+        
+        createStage("Create", false);
     }
     
     @FXML
