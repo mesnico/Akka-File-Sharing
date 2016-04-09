@@ -14,9 +14,11 @@ import java.util.HashMap;
 
 class FileElement{
     boolean occupied;
+    long size;
 
-    public FileElement(boolean occupied) {
+    public FileElement(boolean occupied, long size) {
         this.occupied = occupied;
+        this.size = size;
     }
     
     public boolean isOccupied() {
@@ -25,6 +27,10 @@ class FileElement{
 
     public void setOccupied(boolean occupied) {
         this.occupied = occupied;
+    }
+
+    public long getSize() {
+        return size;
     }
 }
 
@@ -37,17 +43,36 @@ public class FileTable {
     
     //returns false if the entry already existed
     //this method replaces the entry if it already existed
-    private boolean createOrUpdateEntry(String fileName, FileElement e){
+    public boolean createOrUpdateEntry(String fileName, FileElement e){
         FileElement old = fileTable.put(fileName, e);
         if(old==null) return true;
-        return true;
+        return false;
     }
     
     //returns false if the fileName doesn't exists.
-    private boolean deleteEntry(String fileName){
+    public boolean deleteEntry(String fileName){
         FileElement e = fileTable.remove(fileName);
         if(e==null) return false;
         return true;
+    }
+    
+    //check if a file exists in the table
+    public AuthorizationReply getFileStatus(String fileName){
+        if(!fileTable.containsKey(fileName)){
+            return new AuthorizationReply(EnumAuthorizationReply.FILE_NOT_EXISTS);
+        } else if(fileTable.get(fileName).isOccupied()) {
+            return new AuthorizationReply(EnumAuthorizationReply.FILE_BUSY);
+        } else {
+            return new AuthorizationReply(EnumAuthorizationReply.AUTHORIZATION_GRANTED);
+        }
+    }
+    
+    public long getTotalOccupiedSpace(){
+        long sum=0;
+        for(FileElement e : fileTable.values()){
+            sum += e.getSize();
+        }
+        return sum;
     }
     
     @Override
