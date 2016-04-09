@@ -28,8 +28,6 @@ import javafx.stage.WindowEvent;
 public class FXMLCreateController implements Initializable {
     
     @FXML
-    private Button create;
-    @FXML
     private TextField file_name;
     /**
      * Initializes the controller class.

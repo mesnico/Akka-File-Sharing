@@ -19,8 +19,8 @@
           <RowConstraints minHeight="10.0" />
         </rowConstraints>
          <children>
-            <Label fx:id="file_name" text="File name" />
-            <TextField GridPane.columnIndex="1" GridPane.hgrow="ALWAYS" />
+            <Label text="File name" />
+            <TextField fx:id="file_name" GridPane.columnIndex="1" GridPane.hgrow="ALWAYS" />
             <Label alignment="TOP_LEFT" text="Tags" GridPane.rowIndex="1" GridPane.valignment="TOP" />
             <VBox fx:id="vboxTags" spacing="5.0" GridPane.columnIndex="1" GridPane.rowIndex="1">
                <children>
@@ -36,7 +36,7 @@
          </children>
       </GridPane>
       <Region VBox.vgrow="ALWAYS" />
-      <Button fx:id="create" alignment="CENTER" mnemonicParsing="false" onAction="#create" text="Create" />
+      <Button alignment="CENTER" mnemonicParsing="false" onAction="#create" text="Create" />
    </children>
    <padding>
       <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />
