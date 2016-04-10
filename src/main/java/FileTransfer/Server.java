@@ -1,3 +1,6 @@
+package FileTransfer;
+
+import FileTransfer.AuthorizationReply;
 import java.net.InetSocketAddress;
 import akka.actor.ActorRef;
 import akka.actor.Props;

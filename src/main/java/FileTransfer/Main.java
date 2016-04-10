@@ -1,3 +1,4 @@
+package FileTransfer;
 
 import akka.actor.ActorSystem;
 import akka.actor.Props;
@@ -30,6 +31,7 @@ public class Main {
     }
 
     public static void startup(String[] args) throws UnknownHostException {
+        System.out.println("Sono nella main.startup\n");
             String port = args[0];
             String serverIp = args[1];
         // Override the configuration of the port
@@ -45,6 +47,8 @@ public class Main {
                 "clusterListener"+port);
             
             if(port.equals("7777")){  
+                System.out.println("La mia porta è 7777\n");
+                System.out.printf("Il mio ip est %s\n",InetAddress.getLocalHost().toString());
                 InetAddress address = InetAddress.getByName(serverIp);
                 InetSocketAddress remote = new InetSocketAddress(address,5678);
                 
@@ -53,6 +57,8 @@ public class Main {
                         "tcpClient"+port);
             }
             else if(port.equals("2551")){
+                System.out.println("La mia porta è 2551\n");
+                System.out.printf("Il mio ip est %s\n",InetAddress.getLocalHost().toString());
                 //System.out.println("La mia porta è la 2551");    
                 final ActorRef tcpServer = system.actorOf(Props.create(Server.class, clusterListener),
                         "tcpServer"+port);

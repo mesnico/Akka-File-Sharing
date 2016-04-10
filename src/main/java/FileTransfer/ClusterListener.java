@@ -1,3 +1,4 @@
+package FileTransfer;
 
 import akka.actor.UntypedActor;
 import akka.cluster.Cluster;

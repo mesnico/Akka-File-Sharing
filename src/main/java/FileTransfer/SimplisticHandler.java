@@ -1,3 +1,6 @@
+package FileTransfer;
+
+import FileTransfer.AuthorizationReply;
 import akka.actor.ActorRef;
 import akka.actor.UntypedActor;
 import akka.io.Tcp;

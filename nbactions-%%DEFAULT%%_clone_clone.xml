@@ -10,7 +10,7 @@
                 <goal>org.codehaus.mojo:exec-maven-plugin:1.2.1:exec</goal>
             </goals>
             <properties>
-                <exec.args>-classpath %classpath ${packageClassName} 2551 192.168.1.3</exec.args>
+                <exec.args>-classpath %classpath FileTransfer.Main 7777 192.168.56.1</exec.args>
                 <exec.executable>java</exec.executable>
             </properties>
         </action>
@@ -24,9 +24,9 @@
                 <goal>org.codehaus.mojo:exec-maven-plugin:1.2.1:exec</goal>
             </goals>
             <properties>
-                <exec.args>-Xdebug -Xrunjdwp:transport=dt_socket,server=n,address=${jpda.address} -classpath %classpath ${packageClassName} 2551 192.168.1.3</exec.args>
-                <exec.executable>java</exec.executable>
+                <exec.args>-Xdebug -Xrunjdwp:transport=dt_socket,server=n,address=${jpda.address} -classpath %classpath FileTransfer.Main 7777 192.168.56.1</exec.args>
                 <jpda.listen>true</jpda.listen>
+                <exec.executable>java</exec.executable>
             </properties>
         </action>
         <action>
@@ -39,7 +39,7 @@
                 <goal>org.codehaus.mojo:exec-maven-plugin:1.2.1:exec</goal>
             </goals>
             <properties>
-                <exec.args>-classpath %classpath ${packageClassName} 2551 192.168.1.3</exec.args>
+                <exec.args>-classpath %classpath FileTransfer.Main 7777 192.168.56.1</exec.args>
                 <exec.executable>java</exec.executable>
             </properties>
         </action>
