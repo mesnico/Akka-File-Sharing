@@ -46,7 +46,7 @@ public class Client extends UntypedActor {
         this.clusterListener = listener;
         this.fileName = fileName;
         this.behavior = behavior;
-        fileLength = 0;
+        this.fileLength = 0;
         this.readOrWrite = FileModifier.WRITE;
     }
     
@@ -217,9 +217,11 @@ public class Client extends UntypedActor {
                         if (reply == EnumAuthorizationReply.AUTHORIZATION_GRANTED){
                             output.close();
                             myServer.tell(new FileTransferResult(
-                                    MessageType.FILE_RECEIVED_SUCCESSFULLY, fileName, readOrWrite), getSelf());
+                                    MessageType.FILE_RECEIVED_SUCCESSFULLY, fileName, readOrWrite), 
+                                    getSelf());
                             clusterListener.tell(new FileTransferResult(
-                                    MessageType.FILE_RECEIVED_SUCCESSFULLY, fileName, readOrWrite), getSelf());
+                                    MessageType.FILE_RECEIVED_SUCCESSFULLY, fileName, readOrWrite), 
+                                    getSelf());
                         }
                     } 
                 }
