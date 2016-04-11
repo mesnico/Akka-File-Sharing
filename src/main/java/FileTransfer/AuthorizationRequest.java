@@ -15,8 +15,8 @@ import java.io.Serializable;
 
 
 public class AuthorizationRequest implements Serializable {
-    String fileName;
-    FileModifier modifier;
+    private String fileName;
+    private FileModifier modifier;
     
     public AuthorizationRequest(String fileName, FileModifier modifier){
         this.fileName = fileName;

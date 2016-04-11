@@ -13,8 +13,8 @@ import java.util.HashMap;
  */
 
 class FileElement{
-    boolean occupied;
-    long size;
+    private boolean occupied;
+    private long size;
 
     public FileElement(boolean occupied, long size) {
         this.occupied = occupied;

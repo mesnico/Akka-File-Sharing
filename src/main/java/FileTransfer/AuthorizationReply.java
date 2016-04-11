@@ -15,7 +15,7 @@ import java.io.Serializable;
 
 
 public class AuthorizationReply implements Serializable {
-    EnumAuthorizationReply response;
+    private EnumAuthorizationReply response;
     
     public AuthorizationReply(EnumAuthorizationReply response){
         this.response = response;

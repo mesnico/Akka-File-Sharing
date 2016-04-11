@@ -121,31 +121,25 @@ public class SimplisticHandler extends UntypedActor {
                 } else if(behavior == TcpBehavior.SEND_FILE_NOW){
                     output.close(); 
                     //occorre anche cancellare la "parte" di file ricevuta.
-                    //Tra l'altro potremmo entrare qui anche se il client ha 
-                    //provato ad inviare un file che non esiste, quindi andra'
-                    //comunque cancellato il file vuoto creato.
                 } 
-
             } else{ 
-            //tolti gli errori, rimane il caso in cui tutto e' andato a buon fine
+            //A TcpMessage.close() was sent
                 if(behavior == TcpBehavior.SEND_FILE_NOW){
                     output.close();
                     server.tell(new FileTransferResult(
                             MessageType.FILE_RECEIVED_SUCCESSFULLY, fileName, FileModifier.WRITE), getSelf());
                 } else if(behavior == TcpBehavior.RECEIVE_FILE_NOW){
-                    if (reply == EnumAuthorizationReply.AUTHORIZATION_GRANTED){
-                        server.tell(new FileTransferResult(
-                            MessageType.FILE_SENT_SUCCESSFULLY, fileName, readOrWrite), getSelf());
-                    }  
+                    server.tell(new FileTransferResult(
+                        MessageType.FILE_SENT_SUCCESSFULLY, fileName, readOrWrite), getSelf());
+                    //else would be the case of file_busy or file_not_exists --> nothing to do
                 } else if (behavior == TcpBehavior.AUTHORIZATION_REPLY_HANDLE){
                     if(reply == reply.AUTHORIZATION_GRANTED){
-                        //I wasn't able to open the file. 
-                        //If file doesn't exists or it's busy, I have to do nothing
+                        //The file exists but I wasn't able to open the file.
                         System.out.println("[simplHandler]: ho detto al server che può liberare il file\n");
                         server.tell(new FileTransferResult(MessageType.FILE_NO_MORE_BUSY, fileName, readOrWrite), 
                             getSelf());
                     }
-                    
+                    //else if file doesn't exists or it's busy, I have to do nothings
                 } 
             }
             getContext().stop(getSelf());

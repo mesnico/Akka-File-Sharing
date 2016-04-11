@@ -83,7 +83,9 @@ public class Server extends UntypedActor {
                     }
                     break;
                 case FILE_NO_MORE_BUSY:
-                    fileTable.freeEntry(fileName);
+                    if (transferResult.getFileModifier() == FileModifier.WRITE){
+                        fileTable.freeEntry(fileName);
+                    }
                     break;
             }
             //mancano "libera pure il file" e "file inviato con successo --> cancella file")

@@ -1,14 +1,17 @@
 // ------------ THINGS TO MODIFY ------------ //
-// Messages sent to clusterListener are to be sent to MyServer instead.
+// Messages sent to clusterListener are to be sent to GUI instead.
 // 
-// Delete Out concatenation to fileName of received files.
+// Delete "Out" concatenation to fileName of received files.
 //
+// Choose whether to handler or not not enought space available ON THE PC 
+//  - this can be done looking at isPeerClosed()
 // ------------------------------------------ //
 
 package FileTransfer;
 
 import java.net.InetSocketAddress;
 import akka.actor.ActorRef;
+import akka.actor.ActorSelection;
 import akka.actor.PoisonPill;
 import akka.actor.UntypedActor;
 import akka.io.Tcp;
@@ -27,6 +30,7 @@ import java.nio.ByteBuffer;
 public class Client extends UntypedActor {
     final InetSocketAddress remoteServerAddress;
     final ActorRef clusterListener;
+    final ActorSelection myServer;
     String fileName, behaviorString;
     TcpBehavior behavior;
     FileModifier readOrWrite;
@@ -34,15 +38,16 @@ public class Client extends UntypedActor {
     EnumAuthorizationReply reply;
     long fileLength;
     
-    // ---------------------- //
-    // ---- CONSTRUCTORS ---- //
-    // ---------------------- //
+    // ----------------------------------- //
+    // ---- CONSTRUCTORS AND PRESTART ---- //
+    // ----------------------------------- //
     public Client(InetSocketAddress remote, ActorRef listener, String fileName, TcpBehavior behavior) {        
         this.remoteServerAddress = remote;
         this.clusterListener = listener;
         this.fileName = fileName;
         this.behavior = behavior;
         fileLength = 0;
+        this.readOrWrite = FileModifier.WRITE;
     }
     
     public Client(InetSocketAddress remote, ActorRef listener, String fileName, TcpBehavior behavior, 
@@ -56,7 +61,7 @@ public class Client extends UntypedActor {
         if(behavior == TcpBehavior.SEND_FILE){
             //I will send a file: before this, I have to ask permission to myServer
             AuthorizationRequest requestToSend = new AuthorizationRequest(fileName, FileModifier.WRITE);
-            clusterListener.tell(requestToSend, getSelf());
+            myServer.tell(requestToSend, getSelf());
         } else {
             getSelf().tell("echo", getSelf());
         }
@@ -72,9 +77,6 @@ public class Client extends UntypedActor {
                 EnumAuthorizationReply replyFromMyServer = ((AuthorizationReply) msg).getResponse();
                 if (replyFromMyServer == EnumAuthorizationReply.FILE_BUSY ||
                         replyFromMyServer == EnumAuthorizationReply.FILE_NOT_EXISTS){
-                    //se l'autorizzazione e' negata, occorre ritornare, e nella close
-                    //ci sara' da mandare un messggio di tipo invio fallito al clusterListener
-                    //e mandare un "libera pure il file" al server
                     getSelf().tell(PoisonPill.getInstance(),getSelf());
                     return; //da testare
                 }
@@ -82,9 +84,12 @@ public class Client extends UntypedActor {
             final ActorRef tcpManager = Tcp.get(getContext().system()).manager();
             tcpManager.tell(TcpMessage.connect(remoteServerAddress), getSelf());
         } else {
+            // --- REPLY FROM CONNECTION_HANDLER --- //
             final ActorRef connectionHandler = getSender();
             if (msg instanceof CommandFailed) {
-                clusterListener.tell(new FileTransferResult(MessageType.CONNECTION_FAILED), getSelf());
+                if (behavior == TcpBehavior.REQUEST_FILE){
+                    clusterListener.tell(new FileTransferResult(MessageType.CONNECTION_FAILED), getSelf());
+                }
                 getContext().stop(getSelf());
             } else if (msg instanceof Connected) {
                 connectionHandler.tell(TcpMessage.register(getSelf()), getSelf());
@@ -141,7 +146,8 @@ public class Client extends UntypedActor {
                         
                         switch(reply){
                             case AUTHORIZATION_GRANTED:
-                                connectionHandler.tell(TcpMessage.write(ByteString.fromString("ECHO")), getSelf()); //echo
+                                connectionHandler.tell(TcpMessage.write(ByteString.fromString("echo")), 
+                                        getSelf()); //echo
                                 fileName = fileName.concat("Out"); //.concat va tolto nella versione finale
                                 output = new FileOutputStream(fileName);
                                 behavior = TcpBehavior.RECEIVE_FILE_NOW;
@@ -149,13 +155,13 @@ public class Client extends UntypedActor {
                                 break;
                             case FILE_NOT_EXISTS:
                                 clusterListener.tell(new FileTransferResult(
-                                        MessageType.FILE_NOT_EXISTS, fileName, readOrWrite), getSelf());
+                                        MessageType.FILE_NOT_EXISTS, fileName), getSelf());
                                 connectionHandler.tell(TcpMessage.close(), getSelf());
                                 System.out.println("[client]: file_not_exists\n");
                                 break;
                             case FILE_BUSY:
                                 clusterListener.tell(new FileTransferResult(
-                                        MessageType.FILE_BUSY, fileName, readOrWrite), getSelf());
+                                        MessageType.FILE_BUSY, fileName), getSelf());
                                 connectionHandler.tell(TcpMessage.close(), getSelf());
                                 System.out.println("[client]: file_busy\n");
                                 break;
@@ -170,7 +176,7 @@ public class Client extends UntypedActor {
                 }
             } else if(msg instanceof CommandFailed) {
                 // OS kernel socket buffer was full
-                // Qui probabilmente butterei giù tutta la connessione
+                // Here we should probably bring down the whole Tcp connection
             }
                
             // ---------------------------- //
@@ -189,29 +195,31 @@ public class Client extends UntypedActor {
                 if(connection.isErrorClosed()){
                     if(behavior == TcpBehavior.SEND_FILE || behavior == TcpBehavior.SEND_FILENAME ||
                             behavior == TcpBehavior.SEND_FILE_NOW){
-                        clusterListener.tell(new FileTransferResult(MessageType.FILE_SENDING_FAILED, fileName, FileModifier.WRITE),
-                                getSelf());
+                        myServer.tell(new FileTransferResult(
+                                MessageType.FILE_NO_MORE_BUSY, fileName, readOrWrite), getSelf());
                     } else{
                         if (behavior == TcpBehavior.RECEIVE_FILE_NOW){
                             output.close();
                             //bisogna anche cancellare il "pezzo" di file che e' stato creato
                         }
-                        clusterListener.tell(new FileTransferResult(MessageType.FILE_RECEIVING_ERROR, fileName, readOrWrite),getSelf());                    
+                        clusterListener.tell(new FileTransferResult(
+                                MessageType.FILE_RECEIVING_ERROR, fileName),getSelf());                    
                     }
                 } else{ 
                 //sarebbe la connectionClosed
                     if(behavior == TcpBehavior.SEND_FILE_NOW){
-                        clusterListener.tell(new FileTransferResult(
-                                MessageType.FILE_SENT_SUCCESSFULLY, fileName, FileModifier.WRITE), getSelf());
+                        myServer.tell(new FileTransferResult(
+                                MessageType.FILE_SENT_SUCCESSFULLY, fileName, readOrWrite), getSelf());
                     } else if(behavior == TcpBehavior.SEND_FILENAME){
-                        clusterListener.tell(new FileTransferResult(MessageType.FILE_SENDING_FAILED, fileName, FileModifier.WRITE),
-                                getSelf());
+                        //file opening failed: nothing to do
                     }
                     else if(behavior == TcpBehavior.RECEIVE_FILE_NOW){
                         if (reply == EnumAuthorizationReply.AUTHORIZATION_GRANTED){
-                        output.close();
-                        clusterListener.tell(new FileTransferResult(
-                                MessageType.FILE_RECEIVED_SUCCESSFULLY, fileName, readOrWrite), getSelf());
+                            output.close();
+                            myServer.tell(new FileTransferResult(
+                                    MessageType.FILE_RECEIVED_SUCCESSFULLY, fileName, readOrWrite), getSelf());
+                            clusterListener.tell(new FileTransferResult(
+                                    MessageType.FILE_RECEIVED_SUCCESSFULLY, fileName, readOrWrite), getSelf());
                         }
                     } 
                 }
