@@ -13,6 +13,13 @@ import akka.actor.ActorSelection;
 import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.stage.Stage;
+import javafx.stage.StageStyle;
+import javafx.stage.WindowEvent;
 
 /**
  *
@@ -42,7 +49,41 @@ public class GuiActor extends UntypedActor{
     public void onReceive(Object message) throws Exception{
         if(message instanceof CreationResponse){
             log.info("GUI received creation response for file: success {}",((CreationResponse) message).isSuccess());
-        }
+            if(((CreationResponse) message).isSuccess()){
+                //from a request of creation I obtained positive response => Start che creation and modify of the new file
+                GUI.getSecondaryStage().close();
+                
+                try {
+                    FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/fxml/Modify.fxml"));
+                    Parent root = (Parent) fxmlLoader.load();
+                    Stage stage = new Stage();
+                    stage.setScene(new Scene(root));
+                    stage.setTitle("Modify");
+                    //remove "minimize" and "restore down" buttons
+                    stage.initStyle(StageStyle.UTILITY);
+                    //disable close button
+                    stage.setOnCloseRequest((final WindowEvent windowEvent) -> { windowEvent.consume(); });
+                    
+                    GUI.setSecondaryStage(stage);
+                    GUI.getSecondaryStage().show();
+                    GUI.getStage().hide();
+                    
+                } catch(Exception ex) {
+                    System.out.println(ex.getMessage());
+                    System.out.println(ex.getCause().toString());
+                }
+            }else{
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("Error");
+                alert.setHeaderText("Bad name");
+                alert.setContentText("This file is already present in the cluster!");
+
+                alert.showAndWait();
+            }
+        }/*
+        if(message instanceof ModifyRequest){
+            
+        }*/
     }
 
     public static ActorRef getGuiActorRef() {

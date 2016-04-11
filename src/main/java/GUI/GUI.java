@@ -1,6 +1,7 @@
 package GUI;
 
 import akka.actor.PoisonPill;
+import java.util.List;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -10,7 +11,32 @@ import javafx.stage.WindowEvent;
 
 
 public class GUI extends Application {
+    static public class ModifiedFile{
+        private static String fileName;
+        private static List<String> tags;
+
+        public static void set(String fileName, List<String> tags) {
+            ModifiedFile.fileName = fileName;
+            ModifiedFile.tags = tags;
+        }
+        public static String getName(){
+            return ModifiedFile.fileName;
+        }
+        public static List<String> getTags(){
+            return ModifiedFile.tags;
+        }
+    }
+    
     private static Stage primaryStage;
+    private static Stage secondaryStage;
+    
+    public static void setSecondaryStage(Stage secondaryStage) {
+        GUI.secondaryStage = secondaryStage;
+    }
+
+    public static Stage getSecondaryStage() {
+        return secondaryStage;
+    }
     
     @Override
     public void start(Stage stage) throws Exception {
