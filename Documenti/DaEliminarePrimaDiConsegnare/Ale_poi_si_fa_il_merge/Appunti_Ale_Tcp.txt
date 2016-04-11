@@ -1,0 +1,149 @@
+TO DO:
+
+0.2) non mi è riuscito gestire le eccezioni che avvengono quando si tenta di aprire un file che non c'è 
+per passarlo all'altro interlocutore: i miei try catch vengono completamente ignorati e vengono lanciate lo stesso eccezioni.
+Comunqune vabè, un metodo molto semplice sarebbe quello di, prima di usare fileName, controllare se esiste un file con tale
+nome (chiedendolo al server. Infatti questa è una cosa che capita solo quando un client vuole mandare un file di sua sponte).
+
+1)
+Le comunicazioni che ora avvengono fra client e clusterListener (perlomeno quelle riguardanti l'esito delle operazioni di trasferimento)
+dovranno invece avvenire fra client e rispettivo server (quello cioè che gira sulla stessa macchina).
+Il client dovrà poi comunicare con la JavaFX per comunicare gli esiti delle operazioni.
+Il server non credo debba comunicare con la javaFX, perchè tanto il fatto che un file sia sul proprio pc o su un altro dovrebbe
+essere trasparente, per l'utente (almeno credo).
+
+2) Decidere qual è il numero massimo di client da cui il server può accettare connessioni. Va specificato nella bind, attualmente è a 100.
+
+3) non ho ancora capito se, quando il client fa abort(), al server arriva un messaggio di tipo Tcp.Closed$, come mi sembrava le 
+prime volte, o un messaggio di tipo Tcp.ErrorClosed()
+A quanto pare, in seguito alla Abort, il client riceve un Tcp.abort, menttre il serve riceve un Tcp.Errorclosed. Il Tcp.Closed$ viene
+ricevuto quando la connessione viene chiusa per bene.
+
+4) nelle classi di supporto che ho definito, ad es i messaggi scambiati per comunicare l'esito della connessione, 
+in alcune ho messo che i getQualcosa restituiscono stringhe, da altre parti restituiscono il valore dell'enumerato e via.
+
+5) al momento, siccome nel clusterListener stampavo tutti i campi del FileTransferResult, compresi quelli non inizializzati,
+in genere quando creavo tali messaggi inizializzavo tutti i parametri, anche quelli che non servivano.
+Ad esempio nel client, nella onErrorClose (o qualcosa di simile)
+
+6) ad essere proprio pignoli, anche il simplisitc handler, dopo che è stato autorizzato ad inviare un file, quando lo apre,
+dovrebbe controllare se l'apertura è avvenuta con successo.
+
+------------------------------------------------------------------------------------------------------------
+
+3) Spiegare ai ragazzi che non si devono preoccupare se qua e là vedono che si crea una stringa a partire da un ByteString specificando la codifica UTF-8: uno potrebbe pensare che ciò possa creare problemi a seconda del computer usato, ma in realtà non è così perchè prima creiamo un ByteString con la funzione
+fromString(java.lang.String string)
+Creates a new ByteString which will contain the UTF-8 representation of the given String
+
+che quindi usa la codifica UTF-8. Quando poi si riceve il ByteString, lo si decodifica usando sempre UTF-8, con la
+utf8String()
+Decodes this ByteString as a UTF-8 encoded String.
+
+che quindi usa la stessa codifica. In sostanza quel che succede è
+String --> utf-8 --> Bytestring --> utf-8 --> String
+
+
+-----------------------------------------------------------------------------------------------------------
+
+il fatto che il client di sua sponte manda un file avviene
+1) quando uno abbandone il clusterListener
+2) load balancing
+
+1) caso client invia file al server:
+se errore durante stabilimento connessione TCP	
+	client lo comunica al clusterListener CONNECTION_FAILED, server non fa niente
+Se errore durante l'apertura del file
+	client manda una ABORT al server e al suo clusterListener manda una FILE_SENDING_FAILED. 
+	Il server guarderà lo stato, e in base a quello saprà che non deve fare niente
+Se cade la connessione
+	il client guarda la variabile command e comunica al clusterListener FILE_SENDING_FAILED.
+	Il server guarda la variabile command e non fa niente.
+Se va tutto bene
+	il client guarda la variabile command e riferisce al clusterListener FILE_SENT_SUCCESSFULLY e il nome del file
+	il server guarda la variabile command e riferisce al clusterListener FILE_RECEIVED_SUCCESSFULLY e il nome del file e "scrittura"
+	
+2) caso client richiede file al server:
+se errore durante stabilimento connessione TCP
+	client lo comunica al clusterListener CONNECTION_FAILED, server  e non fa niente
+se cade la connessione prima che il server abbia richiesto l'autorizzazione
+	client lo comunica al clusterListener (FILE_RECEIVING_ERROR), il server guarda lo stato e non fa niente.
+
+Se l'autorizzazione è stata concessa: avviene il trasferimento del file.
+	Se errore durante il trasferimento del file:
+		il client guarda il suo stato, e segnala al clusterListener che la ricezione è fallita (FILE_RECEIVING_ERROR). 
+		il server, venuto a sapere che è caduta la connessione, dice al clusterListerner che può liberare il file (FILE_NO_MORE_BUSY),
+		allegando nome del file e modificatore d'accesso. 
+	Se il trasferimento del file va a buon fine: 
+		il server manda la connection close. entrambi vedono che sono nella connection close senza errori, guardano lo stato,
+		e in base a quello comunicano ai rispettivi clusterListener che è andato tutto bene. (client: FILE_RECEIVED_SUCCESSFULLY
+		server: (FILE_SENT_SUCCESSFULLY)
+Se l'autorizzazione non è stata concessa: 
+	il server manda al client l'esito, il client in risposta manda al clusterListener l'esito e poi fa la abort. 
+	Il server non deve fare niente, perchè il file libero era, e libero rimane.
+
+
+IL COMMAND "ASK_AUTHORIZATION" ANDREBBE RINOMINATO IN "AUTHORIZATION_OUTCOME" O QUALCOSA DEL GENERE
+
+AGGIUNGERE IL CASO IN CUI IL SERVER NON RIESCE AD APRIRE IL FILE 
+
+
+
+ESITO TRANSFERIMENTO FILE VIA TCP:
+Posto che i seguenti 2 tipi di errori:
+1) errore mentre viene stabilita la connessione
+2) errore durante la connessione TCP, ad esempio una delle due entità cade
+
+dovrebbero esser gestiti automaticamente. In particolare, il primo è già gestito, occorre solo assicurarsi che avvenga la notifica al
+clusterListener, mentre per il secondo rimane solo da vedere come il connectionHandler gestisce questa cosa, e quindi quale messaggio
+manda.
+
+I problemi dunque che possono ancora verificarsi sono:
+1) apertura del file non riuscita
+2) permesso non concesso
+(infatti si presume che, usando TCP, la connessione risulti automaticamente affidabile)
+
+Vediamo separatamente come comportarsi nei casi
+1) il client manda un file di sua spontanea volontà un file al server (serve solo quando uno va via)
+2) il client richiede un file in lettura al server
+3) il client richiedere un file in scrittura al server
+
+Si ricorda che l'invio di un messaggio di tipo connectionClosed() segnala che il trasferimento è andato a buon fine. 
+
+1) il client riceve l'ordine dal suo clusterListener, 
+apre il file: se non gli riesce, dovrà inviare al suo clusterListener un messaggio che indica questa cosa 
+(magari si può usare la solita struttura, mettendo come enumerato "non sono riuscito ad aprire il file", e come nome il nome del file)
+e poi manda un messaggio di tipo connectionAbort o roba del genere, che deve essere un messaggio che si manda per dire che
+l'invio di un file non è riuscito. Infatti, se questo messaggio non fosse inviato e si arrivasse alla connectionClos(), il server
+si convincerebbe di avere un nuovo file. Il client dopo la connectionAbort non deve fare altro, al massimo deve "chiudersi".
+
+2) il client manda il nome del file al server, il server chiede l'autorizzazione al suo clusterListener.
+A questo punto gli errori possibili sono che il server risponde "il file non c'è" oppure "il file è occupato".
+Il client potrà discernere tra questi 2 casi, e manderà al suo clusterListener un messaggio per comunicargli l'esito.
+Dopo di chè, sarà il client a chiudere correttamente, vedremo come.
+
+
+
+TRASFERIMENTO DI FILE VIA TCP: RICHIESTA IN SCRITTURA O IN LETTURA
+
+- Nel caso in cui il client voglia mandare un messaggio di sua spontanea volontà, non occorre chiedere alcun permesso al server, 
+gli si manda il file e via.
+
+- Nel caso in cui il client voglia richiedere un file al server, bisogna distinguere fra due casi:
+1) Il file viene richiesto in lettura
+2) Il file viene richiesto in scrittura
+
+Nel caso (1) ciò che avverrà è che il file potrebbe essere libero, "occupato" se è in modifica o in creazione, oppure potrebbe non esserci. 
+Avremo quindi che il simplisticHandler del server comunicherà in quale dei 3 stati ci troviamo; il client, se lo stato è "occupato" o
+"inesistente", dovrò chiudere la connessione e comunicare l'esito al suo clusterListener. Se invece è presente, dovrà 
+trasferire il file e, alla fine, comunicare l'esito al clusterListener. 
+C'è da riuscire a riconoscere i casi in cui si verifica qualche problema durante il trasferimento del file, e in tal caso
+va comunicato al ClusterListener. E questo deve valere sia per il client, che deve sapere che il trasferimento non è riuscito, 
+sia per il server, in cui il server deve sapere che il file ce l'ha sempre lui e che non è occupato. 
+
+Per distinguere i casi (1) e (2), il client deve dire al server, oltre al nome del file, se vuole leggerlo o scriverlo.
+Questo è importante perchè, nel caso che il server accetti la richiesta di trasferimento, nel caso della scrittura deve marcare
+il file come occupato, mentre nel caso della lettura no; inoltre alla fine del traferimento, se questo è andato a buon fine, 
+se l'accesso era in scrittura il proprietario deve avviare la procedura per informare su dove si trova ora il file, e alla 
+fine di questa deve cancellarlo. Nella lettura invece non avviene niente di tutto ciò.
+Se il trasferimento va male per qualche motivo, nel caso che l'accesso fosse in scrittura, il clusterListener deve segnare
+che il file non più occupato.

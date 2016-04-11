@@ -46,8 +46,7 @@ public class Main {
             final ActorRef clusterListener = system.actorOf(Props.create(ClusterListener.class, port),
                 "clusterListener"+port);
             
-            if(port.equals("7777")){  
-                System.out.println("La mia porta è 7777\n");
+            if(port.equals("7777")||port.equals("7779")){  
                 System.out.printf("Il mio ip est %s\n",InetAddress.getLocalHost().toString());
                 InetAddress address = InetAddress.getByName(serverIp);
                 InetSocketAddress remote = new InetSocketAddress(address,5678);
@@ -55,6 +54,8 @@ public class Main {
                 final ActorRef tcpClient = system.actorOf(Props.create(Client.class, 
                         remote, clusterListener, "inputFile.txt", TcpBehavior.REQUEST_FILE, FileModifier.WRITE),
                         "tcpClient"+port);
+                
+
             }
             else if(port.equals("2551")){
                 System.out.println("La mia porta è 2551\n");

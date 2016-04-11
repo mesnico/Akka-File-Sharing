@@ -28,6 +28,10 @@ class FileElement{
     public void setOccupied(boolean occupied) {
         this.occupied = occupied;
     }
+    
+    public void setFree(boolean free){
+        this.occupied = free;
+    }
 
     public long getSize() {
         return size;
@@ -38,6 +42,7 @@ public class FileTable {
     private HashMap<String,FileElement> fileTable;
     
     public FileTable(){
+        System.out.println("[fileTable]: fileTable creata");
          fileTable = new HashMap<String,FileElement>();
     }
     
@@ -56,13 +61,26 @@ public class FileTable {
         return true;
     }
     
+    public boolean freeEntry(String fileName){
+        FileElement e = fileTable.get(fileName);
+        if(e == null) return false;
+        fileTable.get(fileName).setFree(true);
+        return true;
+    }
+    
     //check if a file exists in the table
-    public AuthorizationReply getFileStatus(String fileName){
+    public AuthorizationReply testAndSet(String fileName, FileModifier readOrWrite){
         if(!fileTable.containsKey(fileName)){
+            System.out.println("[fileTable]: sono nella testAndSet, sto per restituire FILE_NOT_EXISTS");
             return new AuthorizationReply(EnumAuthorizationReply.FILE_NOT_EXISTS);
         } else if(fileTable.get(fileName).isOccupied()) {
+            System.out.println("[fileTable]: sono nella testAndSet, sto per restituire FILE_BUSY");
             return new AuthorizationReply(EnumAuthorizationReply.FILE_BUSY);
         } else {
+            if(readOrWrite == FileModifier.WRITE){
+                System.out.println("[fileTable]: sono nella testAndSet, sto per marcare il file come occupato");
+                fileTable.get(fileName).setOccupied(true);
+            }
             return new AuthorizationReply(EnumAuthorizationReply.AUTHORIZATION_GRANTED);
         }
     }

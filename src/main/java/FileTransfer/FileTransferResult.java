@@ -15,9 +15,9 @@ import java.io.Serializable;
 
 
 public class FileTransferResult implements Serializable {
-    MessageType msg;
-    String fileName;
-    FileModifier modifier;
+    private MessageType msg;
+    private String fileName;
+    private FileModifier modifier;
     
     public FileTransferResult(MessageType msg){
         this.msg = msg;
@@ -35,15 +35,15 @@ public class FileTransferResult implements Serializable {
         this.modifier = modifier;
     }
     
-    public String getMessageType(){
-        return msg.toString();
+    public MessageType getMessageType(){
+        return msg;
     }
     
     public String getFileName(){
         return fileName;
     }
     
-    public String getFileModifier(){
-        return modifier.toString();
+    public FileModifier getFileModifier(){
+        return modifier;
     }
 }

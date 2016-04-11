@@ -14,10 +14,11 @@ import akka.util.ByteString;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.lang.Object;
+import java.net.InetAddress;
 import java.nio.ByteBuffer;
 
 public class Client extends UntypedActor {
-    final InetSocketAddress serverAddress;
+    final InetSocketAddress remoteServerAddress;
     final ActorRef clusterListener;
     String fileName, behaviorString;
     TcpBehavior behavior;
@@ -30,29 +31,30 @@ public class Client extends UntypedActor {
     // ---- CONSTRUCTORS ---- //
     // ---------------------- //
     public Client(InetSocketAddress remote, ActorRef listener, String fileName, TcpBehavior behavior) {        
-        this.serverAddress = remote;
+        this.remoteServerAddress = remote;
         this.clusterListener = listener;
         this.fileName = fileName;
         this.behavior = behavior;
         fileLength = 0;
-        
-        final ActorRef tcpManager = Tcp.get(getContext().system()).manager();
-            tcpManager.tell(TcpMessage.connect(remote), getSelf());
     }
     
     public Client(InetSocketAddress remote, ActorRef listener, String fileName, TcpBehavior behavior, 
             FileModifier readOrWrite) {        
-        this.serverAddress = remote;
-        this.clusterListener = listener;
-        this.fileName = fileName;
-        this.behavior = behavior;
-        this.readOrWrite = readOrWrite;
-        fileLength = 0;
-        
-        final ActorRef tcpManager = Tcp.get(getContext().system()).manager();
-            tcpManager.tell(TcpMessage.connect(remote), getSelf());
+        this(remote, listener, fileName, behavior);
+        this.readOrWrite = readOrWrite;  
     }
 
+    
+    //I will send a file: before this, I have to ask permission to myServer
+       // AuthorizationRequest requestToSend = new AuthorizationRequest(fileName, FileModifier.WRITE);
+       //clusterListener.tell(requestToSend, getSelf());
+        
+            @Override
+    public void preStart() throws Exception {
+        final ActorRef tcpManager = Tcp.get(getContext().system()).manager();
+        tcpManager.tell(TcpMessage.connect(remoteServerAddress), getSelf());
+    }
+    
     // ----------------------------------- //
     // ---- CONNECTION ENSTABLISHMENT ---- //
     // ----------------------------------- //
@@ -89,7 +91,7 @@ public class Client extends UntypedActor {
                         File fileToSend = new File(fileName);
                         fileLength = fileToSend.length();
                         if (!fileToSend.exists()){
-                            System.out.println("[client]: il file non esiste");
+                            System.out.println("[client]: il file non esiste\n");
                             connectionHandler.tell(TcpMessage.close(), getSelf());
                             break;
                         }
@@ -120,16 +122,19 @@ public class Client extends UntypedActor {
                                 fileName = fileName.concat("Out"); //.concat va tolto nella versione finale
                                 output = new FileOutputStream(fileName);
                                 behavior = TcpBehavior.RECEIVE_FILE_NOW;
+                                System.out.println("[client]: authorization_granted\n");
                                 break;
                             case FILE_NOT_EXISTS:
                                 clusterListener.tell(new FileTransferResult(
                                         MessageType.FILE_NOT_EXISTS, fileName, readOrWrite), getSelf());
                                 connectionHandler.tell(TcpMessage.close(), getSelf());
+                                System.out.println("[client]: file_not_exists\n");
                                 break;
                             case FILE_BUSY:
                                 clusterListener.tell(new FileTransferResult(
                                         MessageType.FILE_BUSY, fileName, readOrWrite), getSelf());
                                 connectionHandler.tell(TcpMessage.close(), getSelf());
+                                System.out.println("[client]: file_busy\n");
                                 break;
                         }
                         break;

@@ -19,7 +19,8 @@ public class SimplisticHandler extends UntypedActor {
     FileOutputStream output;
     FileModifier readOrWrite;
     char readOrWriteChar;
-    EnumAuthorizationReply reply;
+    EnumAuthorizationReply reply; //va usata affinchè nella closed si sappia qual è la risposta data
+    long fileLength;
     
     // --------------------- //
     // ---- CONSTRUCTOR ---- //
@@ -32,6 +33,7 @@ public class SimplisticHandler extends UntypedActor {
         behavior = TcpBehavior.UNINITIALIZED;
         behaviorString = "";
         readOrWriteChar = 'z'; //uninitialized
+        fileLength=0;
     }
     
     // -------------------------------------------- //
@@ -70,9 +72,8 @@ public class SimplisticHandler extends UntypedActor {
                     server.tell(requestToSend, getSelf());
                     break;
                 case RECEIVE_FILE_NOW:
-                    File fileToSend = new File(fileName);
                     Tcp.Event ack_or_notAck = new Tcp.NoAck$();
-                    connectionHandler.tell(TcpMessage.writeFile(fileName, 0, fileToSend.length(), ack_or_notAck),getSelf());
+                    connectionHandler.tell(TcpMessage.writeFile(fileName, 0, fileLength, ack_or_notAck),getSelf());
                     connectionHandler.tell(TcpMessage.close(), getSelf());
                     break;
             }      
@@ -85,7 +86,16 @@ public class SimplisticHandler extends UntypedActor {
             reply = ((AuthorizationReply) msg).getResponse();
             System.out.printf("[simplisticHandler]: ho ricevuto la risposta %s\n", reply.toString());
             connectionHandler.tell(TcpMessage.write(ByteString.fromString(reply.toString())), getSelf());
+            
             if(reply == EnumAuthorizationReply.AUTHORIZATION_GRANTED){
+                File fileToSend = new File(fileName);
+                fileLength = fileToSend.length();
+                if (!fileToSend.exists()){
+                    System.out.println("[simplHandler]: il file non esiste\n");
+                    connectionHandler.tell(TcpMessage.close(), getSelf());
+                    return;     //va bene per uscire, no? 
+                                //è importante che non venga settato il behavior
+                }
                 behavior = TcpBehavior.RECEIVE_FILE_NOW;
             }      
         }  
@@ -127,6 +137,15 @@ public class SimplisticHandler extends UntypedActor {
                         server.tell(new FileTransferResult(
                             MessageType.FILE_SENT_SUCCESSFULLY, fileName, readOrWrite), getSelf());
                     }  
+                } else if (behavior == TcpBehavior.AUTHORIZATION_REPLY_HANDLE){
+                    if(reply == reply.AUTHORIZATION_GRANTED){
+                        //I wasn't able to open the file. 
+                        //If file doesn't exists or it's busy, I have to do nothing
+                        System.out.println("[simplHandler]: ho detto al server che può liberare il file\n");
+                        server.tell(new FileTransferResult(MessageType.FILE_NO_MORE_BUSY, fileName, readOrWrite), 
+                            getSelf());
+                    }
+                    
                 } 
             }
             getContext().stop(getSelf());

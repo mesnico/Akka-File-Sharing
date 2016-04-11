@@ -1,0 +1,108 @@
+COSA RIGUARDA IL PROGETTO
+Progetto su condivisione e modifica dei file tramite dei nodi realizzati tramite attori di AKKA.
+Ogni nodo ha uno spazio limitato concesso all'applicazione.
+
+ID DEI NODI: COS'E', COME VIENE ASSEGNATO
+Ogni nodo è identificato univocamente da una coppia "indirizzo IP, porta".
+L'ID del nodo viene trovato calcolando la funzione hash sull'identificatore univoco di cui sopra. 
+Nel caso venga generato un ID che è già assegnato a qualche nodo, l'ultimo id generato viene modificato in un modo
+ancora da definire (ad esempio aggiungendoci 1), anche se Nicola non è d'accordo. L'idea è di non mettere il controllo, magari vediamo 
+a livello teorica cosa succederebbe se 2 nodi avessero il solito ID
+
+IL METADATO TAG
+Ogni file ha un attributo tag che contiene la lista di keyworkd con le quali è possibile riferirsi a quel file. FRa i tag c'è anche il
+nome completo del file
+
+MEMORIZZAZIONE DELL'UBICAZIONE DEI FILE TRAMITE TABELLA HASH
+I file sono memorizzati nel seguente modo:
+dato un file, si calcola la hash per ognuno dei suoi tag; per ognuno di questi tag, il risultato della funzione hash dovrebbe essere
+l'id del nodo che memorizza l'informazione riguardo a chi possiede tutti i file che contengono quel tag. Nel caso che non sia presente 
+un nodo con tale id, tali informazioni verranno memorizzate dal nodo successivo lungo l'anello.
+
+RICERCA DI UN FILE
+L'utente inserisce negli appositi campi i tag e/o il tag nome completo del file che vuole cercare. Per ogni tag viene calcolato l'hash, 
+e viene fatta la richiesta al nodo resposabile per i file corrispondenti a quel tag.
+Ogni nodo contattato restituirà la lista di coppie (file, proprietario) che appartengono al tag che gli è stato richiesto.
+Il nodo richiedente raccoglierà le informazioni in una lista con "priorità": viene data priorità maggiore a quei file che sono comparsi
+su più tag.
+La lista dei file con priorità permetterà al nodo richiedente di visualizzare i primi N (10?) risultati, ordinati in modo da avere quelli
+con più tag per primi.
+
+LETTURA DI UN FILE
+Una volta effettuata la ricerca del file (sia per tag che per nome completo), se il file non risulterà "occupato" (tramite un apposito flag?)
+sarà possibile selezionare il comando lettura, che provvederà a trasferire, dal nodo proprietario del file, una copia del file.
+Il file non verrà marcato come occupato presso il proprietario.
+Il file si dovrà aprire con il programma di default (??? come si farà a non rendere possibile le modifiche al file?). (nella open
+se non sbaglio potevi specificare se aprire in lettura o in scrittura)
+
+APERTURA DI UN FILE IN SOLA LETTURA
+Nel caso in cui si apra un file in sola lettura, il file viene messo nella cartella temporanea del richiedente, che può così
+farci tutte le modifiche che vuole senza conseguenze sul file originale. Se l'utente chiude il file e poi lo ri-apre, viene
+fatta una nuova richiesta per quel file. 
+
+MODIFICA DI UN FILE
+Sia M il nodo che vuole modificare il file,
+P il nodo che possiere il file
+R il nodo responsabile di un tag
+
+M richiede il file in modifica; P gli passa il file (se non è occupato) e lo marca come occupato; avviene il trasferimento;
+una volta finito il trasferimento, M aggiungerà il file nella sua struttura dati, segnandolo come occupato (infatti lo sta modificando),
+P informerà R del fatto che il proprietario del file è ora M;
+P cancellerà dalla sua struttura dati il file.
+
+Nello sventurato ancorchè quasi impossibile caso in cui un altro nodo RompiCoglioni chieda il file mentre stanno venendo
+aggiornate le informazioni presso R (cioè R pensa ancora che ce l'abbia P, mentre P l'ha cancellato), 
+semplicemente RompiCoglioni verrà indirizzato a P, quindi risulterà che il file non c'è.
+Questo si risolve semplicemente facendo che RompiCoglioni, dopo un certo numero di secondi, prova nuovamente a cercare (rifacendo
+il lookup presso R).
+
+Il file si dovrà aprire con il programma di default così da permetterne le modifiche. In questa fase il nodo non dovrebbe fare richieste
+per altri file.
+(*)Una volta terminate le modifiche il file viene salvato. Viene scelto il nodo più adatto ad ottenere il file in base alla politica di load
+balancing. Vengono informati i nodi che possiedono le informazioni su quel file che non è più nello stato occupato e che il nuovo proprietario
+è quello scelto tra i nodi con spazio disponibile maggiore. Il file viene infine trasferito al nuovo nodo. Direi che prima viene
+trasferito il file, e solo quando questo trasferimento è completato vengono trasferite le informazioni riguardo a dove si trova il file,
+in modo da non creare situazioni di inconsistenza.
+
+CREAZIONE DI UN FILE
+La creazione di un file si svolge nel seguente modo: l'utente inserisce il nome del file ed i tag del file, fra cui verrà inserito
+automaticamente il nome completo. 
+Al momento della conferma, la prima cosa che viene fatta è inviare una richiesta per il tag "nome completo" al nodo
+che è responsabile dell'hash(nome completo).
+Questo mi dirà se tale file è già presente oppure no.
+Nel caso che non sia presente, gestisce atomicamente la richiesta inserendo per prima cosa l'entrata relativa nella tabella,
+inserendo come proprietario colui che sta creando il file e marcando il file come occupato/non disponibile.
+Questo serve perchè in tal modo, se prima che il file sia "disponibile" qualcun altro prova a creare un altro file con il solito nome,
+egli farà la solita procedura ma gli verrà detto che il file esiste già.
+Una volta che la creazione e modifica del file sarà completata, ovvero quando si farà la commit del file, 
+ricadiamo nel caso di modifica del file(*).
+
+ARRIVO NUOVO NODO
+Quando arriva un nuovo nodo, non gli vengono assegnati file di altri inizialmente, 
+gli verranno passate solamente le informazioni dai nodi adiacenti che ora diventano di sua competenza.
+
+ABBANDONO DI UN NODO
+Un nodo che decide di lasciare il cluster dovrà trovare (tramite protocollo chord) il nuovo nodo responsaile per le info che possiede. Tramite
+load distribution deciderà quali sono i nodi a cui dovrà inviare i suoi file. (ovviamente va fatta prima la seconda  cosa)
+
+CRASH DI UN NODO
+Quando un nodo crasha sono due tipi di azioni da intraprendere:
+1)Recupero informazioni mantenute da quel nodo: ogni informazione contenuta nella tabella hash di quel nodo deve essere recuperata e trasferita
+al prossimo nodo attivo, che diventerà responsabile per quelle informazioni. Per recuperare le info si procede dai nodi attivi, che vedendo
+un nodo crashare possono controllare se possiedono file le cui info erano sotto la responsabilità di quel nodo. 
+In questo caso i nodi proprietari
+dei file informano il nuovo nodo responsabile che loro posseggono dei file le quali informazioni sono diventate di sua responsabilità.
+2)I file posseduti dal nodo che crasha vanno perdute. Ogni nodo che possiede info che rimandano a quel nodo devono segnalare che il
+destinatario (o il file) non è più disponibile. Qui c'è da decidere se segnalarle come non più disponibili (da non confondere con "occupate"
+o se eliminarle proprio. Ma ipotizzando che il nodo crashato possa in un secondo momento unirsi di nuovo al gruppo, avendo i soliti file,
+direi che va bene così: non è che i file sono scomparsi per sempre: al momento non c'è chi li possiede, ma potrebbe tornare (soprattutto
+visto che è crashato, quindi magari è uscito non intenzionalmente e vuole tornare al più presto)
+
+GESTIONE DELLA CARTELLA OFFLINE
+C'era il discorso di: e se un tizio brutto e cattivo, mentre è offline, mette nella sua cartella dedicata al programma
+dei file aventi un peso totale maggiore della dimensione che lui dedica al programma, che si fa?
+Si potrebbe fare semplicemente che il programma non parte e dice "la roba nella tua cartella supera la dimensione limite
+di tot MB. Elimina qualcosa o aumenta lo spazio dedicato all'applicazione AleNicFra".
+
+CASI PARTICOLARI - SPAZIO ESAURITO SU TUTTI I NODI
+
