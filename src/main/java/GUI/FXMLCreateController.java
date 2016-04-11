@@ -7,18 +7,14 @@ package GUI;
 
 import GUI.messages.SendCreationRequest;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.ResourceBundle;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
-import javafx.scene.Parent;
-import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.TextField;
-import javafx.stage.Stage;
-import javafx.stage.StageStyle;
-import javafx.stage.WindowEvent;
 
 /**
  * FXML Controller class
@@ -29,36 +25,41 @@ public class FXMLCreateController implements Initializable {
     
     @FXML
     private TextField file_name;
+    @FXML
+    private TextField tag1;
+    @FXML
+    private TextField tag2;
+    @FXML
+    private TextField tag3;
+    @FXML
+    private TextField tag4;
     /**
      * Initializes the controller class.
      */
     @FXML
     private void create(ActionEvent event) {
-        String searchText = file_name.getText();
-        file_name.setText(searchText);
-        if(!searchText.isEmpty()){
+        String newFileName = file_name.getText();
+        file_name.setText(newFileName);
+        if(!newFileName.isEmpty()){
             System.out.println("You clicked Create into the new window!");
             System.out.println("You clicked Modify!");
-            GuiActor.getClusterListenerActorRef().tell(new SendCreationRequest(searchText), GuiActor.getGuiActorRef());
+            
+            //set the ModifiedFile
+            List<String> tags = new ArrayList<>();
+            String tag = tag1.getText();
+            //if the tag is not empty
+            if(!tag.isEmpty()) tags.add(tag);
+            tag = tag2.getText();
+            //if the tag is not empty and is not already present in the list
+            if(!tag.isEmpty() && !tags.contains(tag)) tags.add(tag);
+            tag = tag3.getText();
+            if(!tag.isEmpty() && !tags.contains(tag)) tags.add(tag);
+            tag = tag4.getText();
+            if(!tag.isEmpty() && !tags.contains(tag)) tags.add(tag);
+            GUI.ModifiedFile.set(newFileName, tags);
+            
             //chech for existing files with the same name
-
-            //this has to be done in another message...
-            try {
-                FXMLMainController.getSecondaryStage().close();
-                FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/fxml/Modify.fxml"));
-                Parent root = (Parent) fxmlLoader.load();
-                Stage secondaryStage = new Stage();
-                secondaryStage.setScene(new Scene(root));
-
-                //remove "minimize" and "restore down" buttons
-                secondaryStage.initStyle(StageStyle.UTILITY);
-                //disable close button
-                secondaryStage.setOnCloseRequest((final WindowEvent windowEvent) -> { windowEvent.consume(); });
-
-                FXMLMainController.setSecondaryStage(secondaryStage);
-                secondaryStage.show();
-                //((Stage) label.getScene().getWindow()).hide();
-            } catch(Exception ex) {}
+            GuiActor.getClusterListenerActorRef().tell(new SendCreationRequest(newFileName), GuiActor.getGuiActorRef());
         }else{
             Alert alert = new Alert(Alert.AlertType.ERROR);
             alert.setTitle("Error");

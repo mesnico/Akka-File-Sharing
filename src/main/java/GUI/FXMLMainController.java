@@ -1,5 +1,7 @@
 package GUI;
 
+import ClusterListenerActor.messages.SendModifyRequest;
+import FileTransfer.FileModifier;
 import java.net.URL;
 import java.util.ResourceBundle;
 import javafx.event.ActionEvent;
@@ -14,12 +16,9 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.stage.Stage;
-import javafx.stage.StageStyle;
 import javafx.stage.WindowEvent;
 
 public class FXMLMainController implements Initializable {
-    static private Stage secondaryStage;
-    
     @FXML
     private Label label;
     @FXML
@@ -27,72 +26,46 @@ public class FXMLMainController implements Initializable {
     @FXML
     private TableView<FileEntry> table;
     
-    public static void setSecondaryStage(Stage secondaryStage) {
-        FXMLMainController.secondaryStage = secondaryStage;
-    }
-
-    public static Stage getSecondaryStage() {
-        return secondaryStage;
-    }
-    
-    private void createStage(String FXMLFileName, boolean disableButtons){
-        try {
-            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/fxml/"+FXMLFileName+".fxml"));
-            Parent root = (Parent) fxmlLoader.load();
-            Stage stage = new Stage();
-            stage.setScene(new Scene(root));
-            stage.setTitle(FXMLFileName);
-            if(disableButtons){
-                //remove "minimize" and "restore down" buttons
-                stage.initStyle(StageStyle.UTILITY);
-                //disable close button
-                stage.setOnCloseRequest((final WindowEvent windowEvent) -> { windowEvent.consume(); });
-            }
-            setSecondaryStage(stage);
-            getSecondaryStage().show();
-            GUI.getStage().hide();
-            //((Stage) label.getScene().getWindow()).hide();
-        } catch(Exception ex) {
-            System.out.println(ex.getMessage());
-            System.out.println(ex.getCause().toString());
-        }
-    }
-    
     @FXML
     private void modify(ActionEvent event) {
         System.out.println("You clicked Modify!");
-        //require the file
-        /*
-        //get the selected entry of the TableView
+        //verify if the file is aviable
         FileEntry row = table.getSelectionModel().getSelectedItem();
-        //create a request of the file selected
-        ReadFile message = new ReadFile(row);//filter is a function that help to check the correctness of the search
-        //send the request to the clusterListener
-        GuiActor.controllerActorRef.tell(message, GuiActor.guiActorRef);
-        */
-        //receive it if not busy
+        GuiActor.getClusterListenerActorRef().tell(new SendModifyRequest(row.getName(), row.getOwner(), FileModifier.WRITE), GuiActor.getGuiActorRef());
         
         //this has to be done in another message...
-        createStage("Modify",true);
-    }
-    
-    @FXML
-    private void create(ActionEvent event) {
-        System.out.println("You clicked Create new file!");
-        //label.setText("New file");
-        
-        createStage("Create", false);
+        //createStage("Modify",true);
     }
     
     @FXML
     private void read(ActionEvent event) {
         FileEntry row = table.getSelectionModel().getSelectedItem();
-        //require the file
-        /*
-        ReadFile message = new ReadFile(row);//filter is a function that help to check the correctness of the search
-        GuiActor.controllerActorRef.tell(message, GuiActor.guiActorRef);
-        */
+        GuiActor.getClusterListenerActorRef().tell(new SendModifyRequest(row.getName(), row.getOwner(), FileModifier.READ), GuiActor.getGuiActorRef());
+        
         //receive it if not busy
+    }
+    
+    @FXML
+    private void create(ActionEvent event) {
+        System.out.println("You clicked Create new file!");
+        
+        try {
+            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/fxml/Creation.fxml"));
+            Parent root = (Parent) fxmlLoader.load();
+            Stage stage = new Stage();
+            stage.setScene(new Scene(root));
+            stage.setTitle("Creation");
+            
+            GUI.setSecondaryStage(stage);
+            GUI.getSecondaryStage().show();
+            GUI.getStage().hide();
+            
+        } catch(Exception ex) {
+            System.out.println(ex.getMessage());
+            System.out.println(ex.getCause().toString());
+        }
+        
+        GUI.getSecondaryStage().setOnCloseRequest((final WindowEvent windowEvent) -> { GUI.getStage().show(); });
     }
     
     @FXML
@@ -116,7 +89,7 @@ public class FXMLMainController implements Initializable {
             alert.showAndWait();
         }
     }
-
+    
     @Override
     public void initialize(URL url, ResourceBundle rb) {
         

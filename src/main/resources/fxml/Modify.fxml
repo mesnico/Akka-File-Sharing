@@ -11,7 +11,7 @@
    <children>
       <Label text="Click the below button when all the modifications on the file are finished and the file has been saved" wrapText="true" />
       <Region VBox.vgrow="ALWAYS" />
-      <Button fx:id="done" alignment="TOP_RIGHT" mnemonicParsing="false" onAction="#done" text="Done" />
+      <Button alignment="TOP_RIGHT" mnemonicParsing="false" onAction="#done" text="Done" />
    </children>
    <padding>
       <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />

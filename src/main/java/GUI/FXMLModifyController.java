@@ -5,19 +5,21 @@ import java.util.ResourceBundle;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.scene.control.Button;
 
 public class FXMLModifyController implements Initializable {
-
-    @FXML
-    private Button done;
     
     @FXML
     private void done(ActionEvent event) {
-       FXMLMainController.getSecondaryStage().close();
-       GUI.getStage().show();
+       GUI.getSecondaryStage().close();
        
-       //
+       //the file under modify is: GUI.ModifiedFile.getName();
+       
+       //the file exits the busy-state
+       //load distribution (only destination election)
+       //update tags
+       //send file
+       
+       GUI.getStage().show();
     }
     
     @Override
