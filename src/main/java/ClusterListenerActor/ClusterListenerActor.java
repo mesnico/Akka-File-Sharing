@@ -10,6 +10,7 @@ import ClusterListenerActor.messages.CreationResponse;
 import ClusterListenerActor.messages.Shutdown;
 import ClusterListenerActor.messages.TagSearchRequest;
 import ClusterListenerActor.messages.TagSearchResponse;
+import GUI.messages.SearchRequest;
 import GUI.messages.SendCreationRequest;
 import Startup.AddressResolver;
 import Startup.WatchMe;
@@ -30,7 +31,6 @@ import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import java.math.BigInteger;
 import java.net.UnknownHostException;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 
@@ -222,11 +222,31 @@ public class ClusterListenerActor extends UntypedActor {
             //forward the response to the GUI actor
             guiActor.tell((CreationResponse)message, getSelf());
             
+        } else if (message instanceof SearchRequest){
+            //reset the found file structure for the new search
+            foundFiles.reset();
+            
+            SearchRequest sr = (SearchRequest)message;
+            Member responsibleMember;
+            //foreach tag (tags + filename) I send the request for the search
+            for(String tag : sr.getSearchString().split(" ")){
+                responsibleMember = membersMap.getResponsibleMemberById(
+                    HashUtilities.computeId(tag));
+                getContext().actorSelection(responsibleMember.address() + "/user/clusterListener")
+                    .tell(new TagSearchRequest(tag), getSelf());
+                System.out.println("sent tag for "+tag);
+            }
+            
         } else if (message instanceof TagSearchRequest){
             TagSearchRequest tsr = (TagSearchRequest)message;
             //lookup and retrieve the requested file info
             //then send it to the sender
-            getSender().tell(new TagSearchResponse(infoTable.getByTag(tsr.getTag())), getSelf());
+            List<FileInfoElement> requested = infoTable.getByTag(tsr.getTag());
+            
+            //if the tag exists on this node, it is sent; otherwise the search query is ignored
+            if(requested!=null){
+                getSender().tell(new TagSearchResponse(infoTable.getByTag(tsr.getTag())), getSelf());
+            }
             
         } else if (message instanceof TagSearchResponse){
             List<FileInfoElement> receivedFileInfo = ((TagSearchResponse) message).getReturnedList();

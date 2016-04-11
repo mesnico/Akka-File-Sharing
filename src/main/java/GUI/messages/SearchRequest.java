@@ -5,7 +5,6 @@
  */
 package GUI.messages;
 
-import ClusterListenerActor.messages.*;
 import java.io.Serializable;
 
 /**
@@ -15,7 +14,7 @@ import java.io.Serializable;
 public class SearchRequest implements Serializable{
     private String searchString;
 
-    public SearchRequest(String tag) {
+    public SearchRequest(String searchString) {
         this.searchString = searchString;
     }
 

@@ -5,9 +5,9 @@
  */
 package ClusterListenerActor.messages;
 
-import ClusterListenerActor.FileInfoElement;
 import GUI.FileEntry;
 import java.io.Serializable;
+import java.util.LinkedList;
 import java.util.List;
 
 /**
@@ -17,8 +17,12 @@ import java.util.List;
 public class TagSearchGuiResponse implements Serializable{
     private List<FileEntry> returnedList;
 
-    public TagSearchGuiResponse(List<FileEntry> returnedList) {
-        this.returnedList = returnedList;
+    public TagSearchGuiResponse() {
+        this.returnedList = new LinkedList<FileEntry>();
+    }
+    
+    public void addEntry(FileEntry fe){
+        returnedList.add(fe);
     }
 
     public List<FileEntry> getReturnedList() {

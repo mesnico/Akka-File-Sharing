@@ -43,4 +43,9 @@ public class FileEntry {
     public void setOwner(String owner) {
         this.owner = owner;
     }
+    
+    @Override
+    public String toString(){
+        return name+": "+matches+"matches; owner: "+owner;
+    }
 }

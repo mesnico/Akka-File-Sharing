@@ -6,6 +6,7 @@
 package GUI;
 
 import ClusterListenerActor.messages.CreationResponse;
+import ClusterListenerActor.messages.TagSearchGuiResponse;
 import Startup.AddressResolver;
 import Startup.WatchMe;
 import akka.actor.ActorRef;
@@ -80,10 +81,16 @@ public class GuiActor extends UntypedActor{
 
                 alert.showAndWait();
             }
-        }/*
+            
+        } else if (message instanceof TagSearchGuiResponse){
+            TagSearchGuiResponse r = (TagSearchGuiResponse)message;
+            log.info("Received search infos: {}",r.getReturnedList());
+        }
+        
+        /*
         if(message instanceof ModifyRequest){
             
-        }*/
+        }*/    
     }
 
     public static ActorRef getGuiActorRef() {

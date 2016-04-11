@@ -2,6 +2,7 @@ package GUI;
 
 import GUI.messages.SendModifyRequest;
 import FileTransfer.FileModifier;
+import GUI.messages.SearchRequest;
 import java.net.URL;
 import java.util.ResourceBundle;
 import javafx.event.ActionEvent;
@@ -84,6 +85,9 @@ public class FXMLMainController implements Initializable {
             GuiActor.controllerActorRef.tell(message, GuiActor.guiActorRef);
             */
             //another message will handle the generation of the raws in the TableView
+            
+            //initiate the search
+            GuiActor.getClusterListenerActorRef().tell(new SearchRequest(searchText), GuiActor.getGuiActorRef());
         }
         else{
             Alert alert = new Alert(AlertType.ERROR);
