@@ -1,7 +1,15 @@
+// ------------ THINGS TO MODIFY ------------ //
+// Messages sent to clusterListener are to be sent to MyServer instead.
+// 
+// Delete Out concatenation to fileName of received files.
+//
+// ------------------------------------------ //
+
 package FileTransfer;
 
 import java.net.InetSocketAddress;
 import akka.actor.ActorRef;
+import akka.actor.PoisonPill;
 import akka.actor.UntypedActor;
 import akka.io.Tcp;
 import akka.io.Tcp.CommandFailed;
@@ -14,7 +22,6 @@ import akka.util.ByteString;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.lang.Object;
-import java.net.InetAddress;
 import java.nio.ByteBuffer;
 
 public class Client extends UntypedActor {
@@ -44,15 +51,15 @@ public class Client extends UntypedActor {
         this.readOrWrite = readOrWrite;  
     }
 
-    
-    //I will send a file: before this, I have to ask permission to myServer
-       // AuthorizationRequest requestToSend = new AuthorizationRequest(fileName, FileModifier.WRITE);
-       //clusterListener.tell(requestToSend, getSelf());
-        
-            @Override
+    @Override
     public void preStart() throws Exception {
-        final ActorRef tcpManager = Tcp.get(getContext().system()).manager();
-        tcpManager.tell(TcpMessage.connect(remoteServerAddress), getSelf());
+        if(behavior == TcpBehavior.SEND_FILE){
+            //I will send a file: before this, I have to ask permission to myServer
+            AuthorizationRequest requestToSend = new AuthorizationRequest(fileName, FileModifier.WRITE);
+            clusterListener.tell(requestToSend, getSelf());
+        } else {
+            getSelf().tell("echo", getSelf());
+        }
     }
     
     // ----------------------------------- //
@@ -60,22 +67,38 @@ public class Client extends UntypedActor {
     // ----------------------------------- //
     @Override
     public void onReceive(Object msg) throws Exception {
-        final ActorRef connectionHandler = getSender();
-        if (msg instanceof CommandFailed) {
-            clusterListener.tell(new FileTransferResult(MessageType.CONNECTION_FAILED), getSelf());
-            getContext().stop(getSelf());
-        } else if (msg instanceof Connected) {
-            connectionHandler.tell(TcpMessage.register(getSelf()), getSelf());
-            getContext().become(connected(connectionHandler));   
-            
-            if(behavior == TcpBehavior.SEND_FILE){
-                ByteString commandToSend = ByteString.fromString(TcpBehavior.SEND_FILENAME.toString());
-                connectionHandler.tell(TcpMessage.write(commandToSend), getSelf());
-                behavior = TcpBehavior.SEND_FILENAME;
-            } else if(behavior == TcpBehavior.REQUEST_FILE){
-                ByteString commandToSend = ByteString.fromString(TcpBehavior.SEND_NAME_OF_REQUESTED_FILE.toString());
-                connectionHandler.tell(TcpMessage.write(commandToSend), getSelf());
-                behavior = TcpBehavior.SEND_NAME_OF_REQUESTED_FILE;
+        if(msg instanceof AuthorizationReply || msg instanceof String){
+            if (msg instanceof AuthorizationReply){
+                EnumAuthorizationReply replyFromMyServer = ((AuthorizationReply) msg).getResponse();
+                if (replyFromMyServer == EnumAuthorizationReply.FILE_BUSY ||
+                        replyFromMyServer == EnumAuthorizationReply.FILE_NOT_EXISTS){
+                    //se l'autorizzazione e' negata, occorre ritornare, e nella close
+                    //ci sara' da mandare un messggio di tipo invio fallito al clusterListener
+                    //e mandare un "libera pure il file" al server
+                    getSelf().tell(PoisonPill.getInstance(),getSelf());
+                    return; //da testare
+                }
+            }
+            final ActorRef tcpManager = Tcp.get(getContext().system()).manager();
+            tcpManager.tell(TcpMessage.connect(remoteServerAddress), getSelf());
+        } else {
+            final ActorRef connectionHandler = getSender();
+            if (msg instanceof CommandFailed) {
+                clusterListener.tell(new FileTransferResult(MessageType.CONNECTION_FAILED), getSelf());
+                getContext().stop(getSelf());
+            } else if (msg instanceof Connected) {
+                connectionHandler.tell(TcpMessage.register(getSelf()), getSelf());
+                getContext().become(connected(connectionHandler));   
+
+                if(behavior == TcpBehavior.SEND_FILE){
+                    ByteString commandToSend = ByteString.fromString(TcpBehavior.SEND_FILENAME.toString());
+                    connectionHandler.tell(TcpMessage.write(commandToSend), getSelf());
+                    behavior = TcpBehavior.SEND_FILENAME;
+                } else if(behavior == TcpBehavior.REQUEST_FILE){
+                    ByteString commandToSend = ByteString.fromString(TcpBehavior.SEND_NAME_OF_REQUESTED_FILE.toString());
+                    connectionHandler.tell(TcpMessage.write(commandToSend), getSelf());
+                    behavior = TcpBehavior.SEND_NAME_OF_REQUESTED_FILE;
+                }
             }
         }
     }
