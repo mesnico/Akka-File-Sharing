@@ -8,6 +8,8 @@ import ClusterListenerActor.messages.CreationRequest;
 import ClusterListenerActor.messages.AddTag;
 import ClusterListenerActor.messages.CreationResponse;
 import ClusterListenerActor.messages.Shutdown;
+import ClusterListenerActor.messages.TagSearchRequest;
+import ClusterListenerActor.messages.TagSearchResponse;
 import GUI.messages.SendCreationRequest;
 import Startup.AddressResolver;
 import Startup.WatchMe;
@@ -28,9 +30,9 @@ import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import java.math.BigInteger;
 import java.net.UnknownHostException;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Random;
-import java.util.concurrent.TimeUnit;
-import scala.concurrent.duration.Duration;
 
 /*
  * To change this license header, choose License Headers in Project Properties.
@@ -48,6 +50,7 @@ public class ClusterListenerActor extends UntypedActor {
     HashMembersData membersMap;
     FreeSpaceMembersData membersFreeSpace;
     FileInfoDistributedTable infoTable;
+    FoundFiles foundFiles;
     String localAddress;
     ActorSelection guiActor,soulReaper;
     
@@ -66,6 +69,7 @@ public class ClusterListenerActor extends UntypedActor {
         membersMap = new HashMembersData();
         membersFreeSpace = new FreeSpaceMembersData();
         infoTable = new FileInfoDistributedTable();
+        foundFiles = new FoundFiles();
     }
 
     //subscribe to cluster changes
@@ -217,6 +221,20 @@ public class ClusterListenerActor extends UntypedActor {
         } else if (message instanceof CreationResponse){
             //forward the response to the GUI actor
             guiActor.tell((CreationResponse)message, getSelf());
+            
+        } else if (message instanceof TagSearchRequest){
+            TagSearchRequest tsr = (TagSearchRequest)message;
+            //lookup and retrieve the requested file info
+            //then send it to the sender
+            getSender().tell(new TagSearchResponse(infoTable.getByTag(tsr.getTag())), getSelf());
+            
+        } else if (message instanceof TagSearchResponse){
+            List<FileInfoElement> receivedFileInfo = ((TagSearchResponse) message).getReturnedList();
+            //aggiungo tutti gli elementi 
+            foundFiles.addAll(receivedFileInfo);
+            
+            //tell the GUI actor the calculated response list
+            guiActor.tell(foundFiles.createGuiResponse(), getSelf());
             
         } else if (message instanceof AddTag) {
             //Receved a information for wich I'm the responsible

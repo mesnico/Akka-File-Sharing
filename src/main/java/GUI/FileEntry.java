@@ -9,7 +9,7 @@ package GUI;
  *
  * @author francescop
  */
-class FileEntry {
+public class FileEntry {
     private int matches;
     private String name;
     private String owner;
