@@ -1,6 +1,6 @@
 package GUI;
 
-import ClusterListenerActor.messages.SendModifyRequest;
+import GUI.messages.SendModifyRequest;
 import FileTransfer.FileModifier;
 import java.net.URL;
 import java.util.ResourceBundle;
@@ -29,9 +29,11 @@ public class FXMLMainController implements Initializable {
     @FXML
     private void modify(ActionEvent event) {
         System.out.println("You clicked Modify!");
-        //verify if the file is aviable
+        
+        /* verify if the file is aviable
         FileEntry row = table.getSelectionModel().getSelectedItem();
         GuiActor.getClusterListenerActorRef().tell(new SendModifyRequest(row.getName(), row.getOwner(), FileModifier.WRITE), GuiActor.getGuiActorRef());
+        */
         
         //this has to be done in another message...
         //createStage("Modify",true);
@@ -39,8 +41,11 @@ public class FXMLMainController implements Initializable {
     
     @FXML
     private void read(ActionEvent event) {
+        System.out.println("You clicked Read!");
+        /* verify if the file is aviable
         FileEntry row = table.getSelectionModel().getSelectedItem();
         GuiActor.getClusterListenerActorRef().tell(new SendModifyRequest(row.getName(), row.getOwner(), FileModifier.READ), GuiActor.getGuiActorRef());
+        */
         
         //receive it if not busy
     }
@@ -50,11 +55,11 @@ public class FXMLMainController implements Initializable {
         System.out.println("You clicked Create new file!");
         
         try {
-            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/fxml/Creation.fxml"));
+            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/fxml/Create.fxml"));
             Parent root = (Parent) fxmlLoader.load();
             Stage stage = new Stage();
             stage.setScene(new Scene(root));
-            stage.setTitle("Creation");
+            stage.setTitle("Create");
             
             GUI.setSecondaryStage(stage);
             GUI.getSecondaryStage().show();
