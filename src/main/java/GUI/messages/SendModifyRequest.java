@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package ClusterListenerActor.messages;
+package GUI.messages;
 
 import FileTransfer.FileModifier;
 import java.io.Serializable;
