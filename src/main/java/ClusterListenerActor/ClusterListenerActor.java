@@ -8,8 +8,10 @@ import ClusterListenerActor.messages.CreationRequest;
 import ClusterListenerActor.messages.AddTag;
 import ClusterListenerActor.messages.CreationResponse;
 import ClusterListenerActor.messages.Shutdown;
+import GUI.messages.SendCreationRequest;
 import Startup.AddressResolver;
 import Startup.WatchMe;
+import akka.actor.ActorSelection;
 import akka.actor.Address;
 import akka.actor.PoisonPill;
 import akka.actor.UntypedActor;
@@ -47,6 +49,7 @@ public class ClusterListenerActor extends UntypedActor {
     FreeSpaceMembersData membersFreeSpace;
     FileInfoDistributedTable infoTable;
     String localAddress;
+    ActorSelection guiActor,soulReaper;
     
     int clusterSystemPort;
     final long myFreeSpace = new Random().nextLong();    //THIS IS GENERATED INTERNALLY BUT IT SHOULD NOT (should be taken from mine file table)
@@ -73,32 +76,12 @@ public class ClusterListenerActor extends UntypedActor {
                 MemberEvent.class, UnreachableMember.class);
         //#subscribe
         
+        //create the references to the other actors
+        soulReaper = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"+clusterSystemPort+"/user/soulReaper");
+        guiActor   = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"+clusterSystemPort+"/user/gui");
+        
         //subscrive to to the soul reaper
-        getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"+clusterSystemPort+"/user/soulReaper")
-                .tell(new WatchMe(), getSelf());
-        
-        //TO DELETEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEeeEEEEEEEEEEEEEEEEEEEEEEEEEe
-        //after 15 seconds the actor creates a new file
-        getContext().system().scheduler().scheduleOnce(Duration.create(15000, TimeUnit.MILLISECONDS),
-            new Runnable() {
-                @Override
-                public void run() {
-                    Member responsibleMember = membersMap.getResponsibleMemberById(HashUtilities.computeId("prova"+clusterSystemPort+".txt"));
-                    getContext().actorSelection(responsibleMember.address() + "/user/clusterListener")
-                        .tell(new CreationRequest("prova"+clusterSystemPort+".txt"), getSelf());
-                }
-            }, getContext().system().dispatcher());
-        
-        //after 20 seconds the actor shutdown
-        /*getContext().system().scheduler().scheduleOnce(Duration.create(20000, TimeUnit.MILLISECONDS),
-            new Runnable() {
-                @Override
-                public void run() {
-                        getSelf().tell(new ClusterShutdown(), getSelf());
-                }
-            }, getContext().system().dispatcher());
-        */
-
+        soulReaper.tell(new WatchMe(), getSelf());
     }
 
     //re-subscribe when restart
@@ -212,6 +195,16 @@ public class ClusterListenerActor extends UntypedActor {
                 */
                 
             }
+            
+        } else if (message instanceof SendCreationRequest){
+            //I send the creation request (the filename tag) to the responsible member
+            //so that it can perform the checks and return me a CreationResponse
+            SendCreationRequest cr = (SendCreationRequest) message;
+            Member responsibleMember = membersMap.getResponsibleMemberById(
+                HashUtilities.computeId(cr.getFileName()));
+            getContext().actorSelection(responsibleMember.address() + "/user/clusterListener")
+                .tell(new CreationRequest(cr.getFileName()), getSelf());
+           
         } else if (message instanceof CreationRequest){
             //i am the responsible for the new filename tag. I have to add it to my FileInfoDistributedTable, only if it does not exist yet.
             String fileName = ((CreationRequest)message).getFileName();
@@ -220,6 +213,11 @@ public class ClusterListenerActor extends UntypedActor {
             
             log.debug("Received a creation request. \n Success:{}\nCurrent info table is: {}",success,infoTable.toString());
             log.debug("tag id: {}",HashUtilities.computeId(fileName));
+            
+        } else if (message instanceof CreationResponse){
+            //forward the response to the GUI actor
+            guiActor.tell((CreationResponse)message, getSelf());
+            
         } else if (message instanceof AddTag) {
             //Receved a information for wich I'm the responsible
             AddTag mAddTag = (AddTag) message;

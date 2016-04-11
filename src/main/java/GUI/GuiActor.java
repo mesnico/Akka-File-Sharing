@@ -5,7 +5,7 @@
  */
 package GUI;
 
-import GUI.messages.MyGUIMessage;
+import ClusterListenerActor.messages.CreationResponse;
 import Startup.AddressResolver;
 import Startup.WatchMe;
 import akka.actor.ActorRef;
@@ -21,7 +21,7 @@ import akka.event.LoggingAdapter;
 public class GuiActor extends UntypedActor{
     LoggingAdapter log = Logging.getLogger(getContext().system(), this);
     private static ActorRef guiActorRef;
-    private static ActorSelection clusterListenerActorRef;
+    private static ActorSelection clusterListenerActorRef,soulReaper;
     private final int clusterSystemPort;
     
     public GuiActor(int basePort){
@@ -32,18 +32,17 @@ public class GuiActor extends UntypedActor{
     public void preStart() throws Exception{
         guiActorRef = getSelf();
         clusterListenerActorRef = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"+clusterSystemPort+"/user/clusterListener");
+        soulReaper =              getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"+clusterSystemPort+"/user/soulReaper");
         
         //subscrive to to the soul reaper
-        getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"+clusterSystemPort+"/user/soulReaper")
-                .tell(new WatchMe(), getSelf());
+        soulReaper.tell(new WatchMe(), getSelf());
     }
     
     @Override
     public void onReceive(Object message) throws Exception{
-        /*if(message instanceof MyGUIMessage){
-            System.out.println("Received message from controller; setting textbox message");
-            FXMLMainController.addEntry(((MyGUIMessage) message).getMessage());
-        }*/
+        if(message instanceof CreationResponse){
+            log.info("GUI received creation response for file: success {}",((CreationResponse) message).isSuccess());
+        }
     }
 
     public static ActorRef getGuiActorRef() {
