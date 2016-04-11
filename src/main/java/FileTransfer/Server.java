@@ -1,6 +1,14 @@
+// ------------ THINGS TO MODIFY ------------ //
+// Server port and BACKLOG_SIZE
+// 
+// See comments below
+//
+// 
+// 
+// ------------------------------------------ //
+
 package FileTransfer;
 
-import FileTransfer.AuthorizationReply;
 import java.net.InetSocketAddress;
 import akka.actor.ActorRef;
 import akka.actor.Props;
@@ -31,9 +39,9 @@ public class Server extends UntypedActor {
                     new InetSocketAddress(InetAddress.getLocalHost(), 5678), 
                     100)
                 , getSelf());
-        FileElement newElement = new FileElement(false, 1);
-        boolean ret = fileTable.createOrUpdateEntry("inputFile.txt", newElement);
-        System.out.printf("[server]: createOrUpdateEntry restituisce %b\n", ret);
+        //FileElement newElement = new FileElement(false, 1);
+        //boolean ret = fileTable.createOrUpdateEntry("inputFile.txt", newElement);
+        //System.out.printf("[server]: createOrUpdateEntry restituisce %b\n", ret);
     }
      
     // -------------------------------- //
@@ -42,12 +50,12 @@ public class Server extends UntypedActor {
     @Override
     public void onReceive(Object msg) throws Exception {
         if (msg instanceof Bound) {
-            clusterListener.tell(msg, getSelf());
+            clusterListener.tell(msg, getSelf()); //Are we interested in this? (Bind was successful)
         } else if (msg instanceof CommandFailed) {
-            getContext().stop(getSelf());
+            getContext().stop(getSelf()); //in this case we may bring down the application (bind failed)
         } else if (msg instanceof Connected) {
             final Connected conn = (Connected) msg;
-            clusterListener.tell(conn, getSelf());
+            clusterListener.tell(conn, getSelf()); //Are we interested in this? (a client connected to us)
             final ActorRef handler = getContext().actorOf(
                 Props.create(SimplisticHandler.class, clusterListener, getSender(), getSelf()));
             getSender().tell(TcpMessage.register(handler), getSelf());
@@ -59,12 +67,13 @@ public class Server extends UntypedActor {
         // --- AUTHORIZATION REQUEST --- //
         else if (msg instanceof AuthorizationRequest){
             AuthorizationRequest receivedRequest = (AuthorizationRequest)msg;
-            AuthorizationReply rensponseToSend = fileTable.testAndSet(((AuthorizationRequest) msg).getFileName(),
-                    ((AuthorizationRequest) msg).getModifier());
-            getSender().tell(rensponseToSend, getSelf());   
             
-            System.out.printf("Ho ricevuto una richiesta di %s sul file %s.\n",
+            System.out.printf("I've received a %s request on file %s\n",
                     receivedRequest.getModifier(),receivedRequest.getFileName());
+            
+            AuthorizationReply rensponseToSend = fileTable.testAndSet(
+                    receivedRequest.getFileName(), receivedRequest.getModifier());
+            getSender().tell(rensponseToSend, getSelf());   
         } 
         
         // --- FILE TRANSFER RESULT --- //
@@ -88,7 +97,6 @@ public class Server extends UntypedActor {
                     }
                     break;
             }
-            //mancano "libera pure il file" e "file inviato con successo --> cancella file")
         }
     }    
 }

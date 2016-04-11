@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.lang.Object;
 import java.nio.ByteBuffer;
+import java.nio.file.NoSuchFileException;
 
 public class Client extends UntypedActor {
     final InetSocketAddress remoteServerAddress;
@@ -78,13 +79,13 @@ public class Client extends UntypedActor {
                 if (replyFromMyServer == EnumAuthorizationReply.FILE_BUSY ||
                         replyFromMyServer == EnumAuthorizationReply.FILE_NOT_EXISTS){
                     getSelf().tell(PoisonPill.getInstance(),getSelf());
-                    return; //da testare
+                    return; //must be tested
                 }
             }
             final ActorRef tcpManager = Tcp.get(getContext().system()).manager();
             tcpManager.tell(TcpMessage.connect(remoteServerAddress), getSelf());
         } else {
-            // --- REPLY FROM CONNECTION_HANDLER --- //
+            // --- REPLY FROM CONNECTIONHANDLER --- //
             final ActorRef connectionHandler = getSender();
             if (msg instanceof CommandFailed) {
                 if (behavior == TcpBehavior.REQUEST_FILE){
@@ -165,6 +166,7 @@ public class Client extends UntypedActor {
                                 connectionHandler.tell(TcpMessage.close(), getSelf());
                                 System.out.println("[client]: file_busy\n");
                                 break;
+                            // --- The last 2 cases my be uniformed using MessageType.valueof(reply) --- //
                         }
                         break;
                     case RECEIVE_FILE_NOW:
@@ -200,7 +202,12 @@ public class Client extends UntypedActor {
                     } else{
                         if (behavior == TcpBehavior.RECEIVE_FILE_NOW){
                             output.close();
-                            //bisogna anche cancellare il "pezzo" di file che e' stato creato
+                            try{ //must be tested
+                                File corruptedFile = new File(fileName);
+                                corruptedFile.delete();
+                            } catch (Exception e){
+                                System.out.println("Not a big deal!");
+                            }
                         }
                         clusterListener.tell(new FileTransferResult(
                                 MessageType.FILE_RECEIVING_ERROR, fileName),getSelf());                    

@@ -120,7 +120,12 @@ public class SimplisticHandler extends UntypedActor {
                             getSelf());
                 } else if(behavior == TcpBehavior.SEND_FILE_NOW){
                     output.close(); 
-                    //occorre anche cancellare la "parte" di file ricevuta.
+                    try{ //must be tested
+                        File corruptedFile = new File(fileName);
+                        corruptedFile.delete();
+                    } catch (Exception e){
+                        System.out.println("Not a big deal!");
+                    }
                 } 
             } else{ 
             //A TcpMessage.close() was sent
