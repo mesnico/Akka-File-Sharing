@@ -134,6 +134,8 @@ public class SimplisticHandler extends UntypedActor {
                     server.tell(new FileTransferResult(
                             MessageType.FILE_RECEIVED_SUCCESSFULLY, fileName, FileModifier.WRITE), getSelf());
                 } else if(behavior == TcpBehavior.RECEIVE_FILE_NOW){
+                    //devo aggiungere che, se la close e' stata mandata dal client, 
+                    //significa che c'e' stato un errore
                     server.tell(new FileTransferResult(
                         MessageType.FILE_SENT_SUCCESSFULLY, fileName, readOrWrite), getSelf());
                     //else would be the case of file_busy or file_not_exists --> nothing to do

@@ -1,11 +1,47 @@
-// ------------ THINGS TO MODIFY ------------ //
-// Messages sent to clusterListener are to be sent to GUI instead.
-// 
-// Delete "Out" concatenation to fileName of received files.
-//
-// Choose whether to handler or not not enought space available ON THE PC 
-//  - this can be done looking at isPeerClosed()
-// ------------------------------------------ //
+/*
+************ DOCUMENTATION START ************
+
+ - Client Class local variabile:
+    + boolean IOError 
+        this variabile is setted to true if the Client ask a file, start
+        receiving it, but an IO error arise. We are not intrested in handling
+        the particular error, it is enought for us to comunicate the 
+        transfer failure and close the connection with a TcpMessage.Close().
+        In the connectionClosed handling, we will use this variabile to 
+        understand if there was an error during the file receiving or not.
+
+
+************ DOCUMENTATION END ************
+************ TO DO START ************
+
+Messages sent to clusterListener are to be sent to GUI instead.
+ 
+Delete "Out" concatenation to fileName of received files.
+
+Choose whether to handler or not not enought space available ON THE PC 
+    - this can be done looking at isPeerClosed()
+
+Ask to the collegue who is in charghe to remember node's free space.
+Big problem: what if I am receiving a file, and in the while a member of the cluster,
+looking at my (not updated) available space, think I am the node with the more free space
+and send me a file. Well, here arise the fact I don't remember how to free space is propagated.
+However, is would be sufficient to tell, as soon as I start making a request of a file, 
+propagating the info "my occupied space is <previous occupied space + file requested size>";
+Then, periodically the available space is propagated, so even if the transfer is not successfull,
+soon or later the world will know my true occupied space
+     From this viewpoint, it would be very useful Francesco's idea to comunicate, along with
+who have a file corresponding to a certaing tag, the space occupied by this file:
+in this way the node may, as soon as he choose to request a selected file, increase his occupied
+space of that quantity, and communicate his new available space to the cluster.
+if in a second moment he discover the transfer wasn-t successfully for some reason,
+he can just subtract that space (in the fileResult message, it would be useful to say also the file dim
+The client should have a "fileSize" variabile, used both for communicating the size of the
+received file and for show the progress bar.
+
+************ TO DO END ************
+*/
+
+
 
 package FileTransfer;
 
@@ -31,13 +67,14 @@ import java.nio.file.NoSuchFileException;
 public class Client extends UntypedActor {
     final InetSocketAddress remoteServerAddress;
     final ActorRef clusterListener;
-    final ActorSelection myServer;
+    //final ActorSelection myServer;
     String fileName, behaviorString;
     TcpBehavior behavior;
     FileModifier readOrWrite;
     FileOutputStream output;
     EnumAuthorizationReply reply;
     long fileLength;
+    boolean IOError;
     
     // ----------------------------------- //
     // ---- CONSTRUCTORS AND PRESTART ---- //
@@ -49,6 +86,7 @@ public class Client extends UntypedActor {
         this.behavior = behavior;
         this.fileLength = 0;
         this.readOrWrite = FileModifier.WRITE;
+        this.IOError = false;
     }
     
     public Client(InetSocketAddress remote, ActorRef listener, String fileName, TcpBehavior behavior, 
@@ -61,8 +99,9 @@ public class Client extends UntypedActor {
     public void preStart() throws Exception {
         if(behavior == TcpBehavior.SEND_FILE){
             //I will send a file: before this, I have to ask permission to myServer
-            AuthorizationRequest requestToSend = new AuthorizationRequest(fileName, FileModifier.WRITE);
-            myServer.tell(requestToSend, getSelf());
+            //AuthorizationRequest requestToSend = new AuthorizationRequest(fileName, FileModifier.WRITE);
+            //myServer.tell(requestToSend, getSelf());
+            System.out.println("File sending disabled");
         } else {
             getSelf().tell("echo", getSelf());
         }
@@ -173,7 +212,10 @@ public class Client extends UntypedActor {
                         ByteBuffer buffer = ((Received) msg).data().toByteBuffer();
                         try{
                             output.write(buffer.array());
-                        } catch (Exception e){}
+                        } catch (Exception e){
+                            IOError = true;
+                            connectionHandler.tell(TcpMessage.close(), getSelf());
+                        }
                         break;
                 }
             } else if(msg instanceof CommandFailed) {
@@ -197,16 +239,24 @@ public class Client extends UntypedActor {
                 if(connection.isErrorClosed()){
                     if(behavior == TcpBehavior.SEND_FILE || behavior == TcpBehavior.SEND_FILENAME ||
                             behavior == TcpBehavior.SEND_FILE_NOW){
-                        myServer.tell(new FileTransferResult(
-                                MessageType.FILE_NO_MORE_BUSY, fileName, readOrWrite), getSelf());
+                        clusterListener.tell(new FileTransferResult(
+                                    MessageType.FILE_SENDING_FAILED), getSelf());
+                        //myServer.tell(new FileTransferResult(
+                          //      MessageType.FILE_NO_MORE_BUSY, fileName, readOrWrite), getSelf());
                     } else{
                         if (behavior == TcpBehavior.RECEIVE_FILE_NOW){
                             output.close();
+                            /*
                             try{ //must be tested
                                 File corruptedFile = new File(fileName);
                                 corruptedFile.delete();
                             } catch (Exception e){
                                 System.out.println("Not a big deal!");
+                            }
+                            */
+                            File corruptedFile = new File(fileName);
+                            if(corruptedFile.exists() && corruptedFile.canWrite()){
+                                corruptedFile.delete();
                             }
                         }
                         clusterListener.tell(new FileTransferResult(
@@ -215,20 +265,31 @@ public class Client extends UntypedActor {
                 } else{ 
                 //sarebbe la connectionClosed
                     if(behavior == TcpBehavior.SEND_FILE_NOW){
-                        myServer.tell(new FileTransferResult(
-                                MessageType.FILE_SENT_SUCCESSFULLY, fileName, readOrWrite), getSelf());
+                        //myServer.tell(new FileTransferResult(
+                          //      MessageType.FILE_SENT_SUCCESSFULLY, fileName, readOrWrite), getSelf());
                     } else if(behavior == TcpBehavior.SEND_FILENAME){
                         //file opening failed: nothing to do
                     }
                     else if(behavior == TcpBehavior.RECEIVE_FILE_NOW){
                         if (reply == EnumAuthorizationReply.AUTHORIZATION_GRANTED){
-                            output.close();
-                            myServer.tell(new FileTransferResult(
-                                    MessageType.FILE_RECEIVED_SUCCESSFULLY, fileName, readOrWrite), 
-                                    getSelf());
+                            // the previous check has to be done: we may come here also if
+                            // the authorization wasn't granted 
+                            if (IOError == true){
+                                //error like not enought free space on disk
+                                File corruptedFile = new File(fileName);
+                                if(corruptedFile.exists() && corruptedFile.canWrite()){
+                                    corruptedFile.delete();
+                                }
+                                //credo andrebbe anche qui una output.close()
+                            } else {
+                            output.close(); //andrebbe messo anche questo dentro un try close...
+                            //myServer.tell(new FileTransferResult(
+                              //      MessageType.FILE_RECEIVED_SUCCESSFULLY, fileName, readOrWrite), 
+                                //    getSelf());
                             clusterListener.tell(new FileTransferResult(
                                     MessageType.FILE_RECEIVED_SUCCESSFULLY, fileName, readOrWrite), 
                                     getSelf());
+                            }
                         }
                     } 
                 }
