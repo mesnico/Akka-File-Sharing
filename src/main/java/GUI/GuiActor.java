@@ -14,10 +14,12 @@ import akka.actor.ActorSelection;
 import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
+import javafx.collections.ObservableList;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
+import javafx.scene.control.TableView;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.stage.WindowEvent;
@@ -85,6 +87,9 @@ public class GuiActor extends UntypedActor{
         } else if (message instanceof TagSearchGuiResponse){
             TagSearchGuiResponse r = (TagSearchGuiResponse)message;
             log.info("Received search infos: {}",r.getReturnedList());
+            
+            FXMLMainController.getTable().setEditable(true);
+            FXMLMainController.getTable().setItems((ObservableList<FileEntry>) r.getReturnedList());
         }
         
         /*

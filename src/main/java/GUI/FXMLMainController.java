@@ -27,6 +27,8 @@ public class FXMLMainController implements Initializable {
     @FXML
     private TableView<FileEntry> table;
     
+    private static TableView<FileEntry> tableView;
+    
     @FXML
     private void modify(ActionEvent event) {
         System.out.println("You clicked Modify!");
@@ -98,9 +100,12 @@ public class FXMLMainController implements Initializable {
             alert.showAndWait();
         }
     }
+    public static TableView<FileEntry> getTable(){
+        return tableView;
+    }
     
     @Override
     public void initialize(URL url, ResourceBundle rb) {
-        
+        tableView = table;
     }
 }

@@ -5,11 +5,13 @@
  */
 package GUI;
 
+import javafx.beans.Observable;
+
 /**
  *
  * @author francescop
  */
-public class FileEntry {
+public class FileEntry{
     private int matches;
     private String name;
     private String owner;
@@ -46,6 +48,6 @@ public class FileEntry {
     
     @Override
     public String toString(){
-        return name+": "+matches+"matches; owner: "+owner;
+        return name+": "+matches+" matches; owner: "+owner;
     }
 }
