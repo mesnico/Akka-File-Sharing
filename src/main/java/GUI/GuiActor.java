@@ -14,6 +14,7 @@ import akka.actor.ActorSelection;
 import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
+import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -89,7 +90,10 @@ public class GuiActor extends UntypedActor{
             log.info("Received search infos: {}",r.getReturnedList());
             
             FXMLMainController.getTable().setEditable(true);
-            FXMLMainController.getTable().setItems((ObservableList<FileEntry>) r.getReturnedList());
+            ObservableList<FileEntry> tags = FXCollections.observableArrayList();
+            for(FileEntry fe : r.getReturnedList()) tags.add(fe);
+            log.info("Received search infos (ObservableList<FileEntry>): {}",tags);
+            FXMLMainController.getTable().setItems(tags);
         }
         
         /*

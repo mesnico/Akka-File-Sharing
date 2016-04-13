@@ -6,6 +6,8 @@
 <?import javafx.scene.*?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
+<?import javafx.scene.control.cell.*?> 
+<?import javafx.collections.*?> 
 
 <VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="480.0" prefWidth="640.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="GUI.FXMLMainController">
    <children>
@@ -16,12 +18,12 @@
             <Region HBox.hgrow="ALWAYS" />
             <HBox>
                <children>
-                  <TextField fx:id="search" promptText="Search new file">
+                  <TextField fx:id="search" onAction="#search" promptText="Search new file">
                      <padding>
                         <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
                      </padding>
                   </TextField>
-                  <Button alignment="CENTER" mnemonicParsing="false" onAction="#search"  text="Submit" textAlignment="CENTER">
+                  <Button alignment="CENTER" mnemonicParsing="false" onAction="#search" text="Submit" textAlignment="CENTER">
                      <padding>
                         <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
                      </padding>
@@ -38,9 +40,18 @@
       </HBox>
       <TableView fx:id="table" tableMenuButtonVisible="true" VBox.vgrow="ALWAYS">
         <columns>
-          <TableColumn minWidth="-1.0" prefWidth="100.0" text="# of Matches" />
-          <TableColumn minWidth="-1.0" prefWidth="250.0" text="File Name" />
-          <TableColumn editable="false" minWidth="-1.0" prefWidth="250.0" text="Owner" />
+            <TableColumn minWidth="-1.0" prefWidth="100.0" text="# of Matches">
+                <cellValueFactory><PropertyValueFactory property="matches" />
+                </cellValueFactory>
+            </TableColumn>
+            <TableColumn minWidth="-1.0" prefWidth="250.0" text="File Name">
+                <cellValueFactory><PropertyValueFactory property="fileName" />
+                </cellValueFactory>
+            </TableColumn>
+            <TableColumn editable="false" minWidth="-1.0" prefWidth="250.0" text="Owner">
+                <cellValueFactory><PropertyValueFactory property="owner" />
+                </cellValueFactory>
+            </TableColumn>
         </columns>
          <VBox.margin>
             <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />
@@ -48,12 +59,13 @@
       </TableView>
       <HBox alignment="CENTER" spacing="20.0">
          <children>
+            <Button mnemonicParsing="false" onAction="#create" text="Create new file" />
+            <Region HBox.hgrow="ALWAYS" />
             <Button mnemonicParsing="false" onAction="#modify" text="Modify" />
             <Button mnemonicParsing="false" onAction="#read" text="Read" />
-            <Button mnemonicParsing="false" onAction="#create" text="Create new file" />
          </children>
          <VBox.margin>
-            <Insets bottom="20.0" />
+            <Insets bottom="20.0" left="20.0" right="20.0" />
          </VBox.margin>
       </HBox>
    </children>

@@ -5,49 +5,47 @@
  */
 package GUI;
 
-import javafx.beans.Observable;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
 
 /**
  *
  * @author francescop
  */
-public class FileEntry{
-    private int matches;
-    private String name;
-    private String owner;
+public final class FileEntry{
+    private final StringProperty matches = new SimpleStringProperty("");
+    private final StringProperty fileName = new SimpleStringProperty("");
+    private final StringProperty owner = new SimpleStringProperty("");
 
     public FileEntry(int matches, String name, String owner) {
-        this.matches = matches;
-        this.name = name;
-        this.owner = owner;
+        setMatches(matches);
+        setFileName(name);
+        setOwner(owner);
     }
 
     public int getMatches() {
-        return matches;
+        return Integer.parseInt(matches.get());
     }
-
     public void setMatches(int matches) {
-        this.matches = matches;
+        this.matches.set(""+matches);
     }
 
     public String getName() {
-        return name;
+        return fileName.get();
     }
-
-    public void setName(String name) {
-        this.name = name;
+    public void setFileName(String fileName) {
+        this.fileName.set(fileName);
     }
 
     public String getOwner() {
-        return owner;
+        return owner.get();
     }
-
     public void setOwner(String owner) {
-        this.owner = owner;
+        this.owner.set(owner);
     }
     
     @Override
     public String toString(){
-        return name+": "+matches+" matches; owner: "+owner;
+        return getName()+": "+getMatches()+" matches; owner: "+getOwner();
     }
 }
