@@ -89,11 +89,11 @@ public class GuiActor extends UntypedActor{
             TagSearchGuiResponse r = (TagSearchGuiResponse)message;
             log.info("Received search infos: {}",r.getReturnedList());
             
-            FXMLMainController.getTable().setEditable(true);
             ObservableList<FileEntry> tags = FXCollections.observableArrayList();
             for(FileEntry fe : r.getReturnedList()) tags.add(fe);
             log.info("Received search infos (ObservableList<FileEntry>): {}",tags);
             FXMLMainController.getTable().setItems(tags);
+            FXMLMainController.getTable().sort();
         }
         
         /*

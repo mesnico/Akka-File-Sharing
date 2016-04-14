@@ -20,7 +20,7 @@
         </rowConstraints>
          <children>
             <Label text="File name" />
-            <TextField fx:id="file_name" GridPane.columnIndex="1" GridPane.hgrow="ALWAYS" />
+            <TextField fx:id="file_name" onAction="#create" GridPane.columnIndex="1" GridPane.hgrow="ALWAYS" />
             <Label alignment="TOP_LEFT" text="Tags" GridPane.rowIndex="1" GridPane.valignment="TOP" />
             <VBox fx:id="vboxTags" spacing="5.0" GridPane.columnIndex="1" GridPane.rowIndex="1">
                <children>
