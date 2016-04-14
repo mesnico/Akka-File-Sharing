@@ -20,7 +20,6 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
-import javafx.scene.control.TableView;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.stage.WindowEvent;
@@ -89,8 +88,8 @@ public class GuiActor extends UntypedActor{
             TagSearchGuiResponse r = (TagSearchGuiResponse)message;
             log.info("Received search infos: {}",r.getReturnedList());
             
-            ObservableList<FileEntry> tags = FXCollections.observableArrayList();
-            for(FileEntry fe : r.getReturnedList()) tags.add(fe);
+            ObservableList<FileEntry> tags = FXCollections.observableList(r.getReturnedList());
+            //for(FileEntry fe : r.getReturnedList()) tags.add(fe);
             log.info("Received search infos (ObservableList<FileEntry>): {}",tags);
             FXMLMainController.getTable().setItems(tags);
             FXMLMainController.getTable().sort();

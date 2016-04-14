@@ -30,6 +30,7 @@ import akka.cluster.MemberStatus;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import java.math.BigInteger;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.List;
 import java.util.Random;
@@ -299,7 +300,7 @@ public class ClusterListenerActor extends UntypedActor {
     }
     
     //returns a string containing the remote address
-    private String getAddress(Address address) throws UnknownHostException{
+    private String getAddress(Address address) throws UnknownHostException, SocketException{
         return (address.hasLocalScope()) ? address.hostPort()+"@"+AddressResolver.getMyIpAddress()+":"+clusterSystemPort : address.hostPort();
     }
 }

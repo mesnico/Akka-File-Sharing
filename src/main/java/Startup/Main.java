@@ -8,6 +8,7 @@ import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import javafx.application.Application;
 import GUI.*;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 
 /*
@@ -21,7 +22,7 @@ import java.net.UnknownHostException;
  * @author nicky
  */
 public class Main {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws SocketException {
         try{
             if (args.length == 0)
                 startup("2551");
@@ -32,7 +33,7 @@ public class Main {
         }
     }
 
-    public static void startup(String strPort) throws UnknownHostException{
+    public static void startup(String strPort) throws UnknownHostException, SocketException{
         int basePort = Integer.parseInt(strPort);
         
         //creates the GUI
