@@ -30,7 +30,7 @@ public final class FileEntry{
         this.matches.set(""+matches);
     }
 
-    public String getName() {
+    public String getFileName() {
         return fileName.get();
     }
     public void setFileName(String fileName) {
@@ -46,6 +46,6 @@ public final class FileEntry{
     
     @Override
     public String toString(){
-        return getName()+": "+getMatches()+" matches; owner: "+getOwner();
+        return getFileName()+": "+getMatches()+" matches; owner: "+getOwner();
     }
 }
