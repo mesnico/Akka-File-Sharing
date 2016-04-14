@@ -39,9 +39,9 @@ public class Server extends UntypedActor {
                     new InetSocketAddress(InetAddress.getLocalHost(), 5678), 
                     100)
                 , getSelf());
-        //FileElement newElement = new FileElement(false, 1);
-        //boolean ret = fileTable.createOrUpdateEntry("inputFile.txt", newElement);
-        //System.out.printf("[server]: createOrUpdateEntry restituisce %b\n", ret);
+        FileElement newElement = new FileElement(false, 1);
+        boolean ret = fileTable.createOrUpdateEntry("inputFile.txt", newElement);
+        System.out.printf("[server]: createOrUpdateEntry restituisce %b\n", ret);
     }
      
     // -------------------------------- //
@@ -59,6 +59,8 @@ public class Server extends UntypedActor {
             final ActorRef handler = getContext().actorOf(
                 Props.create(SimplisticHandler.class, clusterListener, getSender(), getSelf()));
             getSender().tell(TcpMessage.register(handler), getSelf());
+            System.out.printf("[server] io sono %s\n", getSelf());
+            System.out.printf("[server] ora credo l'handler %s\n", handler.toString());
         }
         
         // --------------------------------- //

@@ -1,48 +1,3 @@
-/*
-************ DOCUMENTATION START ************
-
- - Client Class local variabile:
-    + boolean IOError 
-        this variabile is setted to true if the Client ask a file, start
-        receiving it, but an IO error arise. We are not intrested in handling
-        the particular error, it is enought for us to comunicate the 
-        transfer failure and close the connection with a TcpMessage.Close().
-        In the connectionClosed handling, we will use this variabile to 
-        understand if there was an error during the file receiving or not.
-
-
-************ DOCUMENTATION END ************
-************ TO DO START ************
-
-Messages sent to clusterListener are to be sent to GUI instead.
- 
-Delete "Out" concatenation to fileName of received files.
-
-Choose whether to handler or not not enought space available ON THE PC 
-    - this can be done looking at isPeerClosed()
-
-Ask to the collegue who is in charghe to remember node's free space.
-Big problem: what if I am receiving a file, and in the while a member of the cluster,
-looking at my (not updated) available space, think I am the node with the more free space
-and send me a file. Well, here arise the fact I don't remember how to free space is propagated.
-However, is would be sufficient to tell, as soon as I start making a request of a file, 
-propagating the info "my occupied space is <previous occupied space + file requested size>";
-Then, periodically the available space is propagated, so even if the transfer is not successfull,
-soon or later the world will know my true occupied space
-     From this viewpoint, it would be very useful Francesco's idea to comunicate, along with
-who have a file corresponding to a certaing tag, the space occupied by this file:
-in this way the node may, as soon as he choose to request a selected file, increase his occupied
-space of that quantity, and communicate his new available space to the cluster.
-if in a second moment he discover the transfer wasn-t successfully for some reason,
-he can just subtract that space (in the fileResult message, it would be useful to say also the file dim
-The client should have a "fileSize" variabile, used both for communicating the size of the
-received file and for show the progress bar.
-
-************ TO DO END ************
-*/
-
-
-
 package FileTransfer;
 
 import java.net.InetSocketAddress;
@@ -99,13 +54,61 @@ public class Client extends UntypedActor {
     public void preStart() throws Exception {
         if(behavior == TcpBehavior.SEND_FILE){
             //I will send a file: before this, I have to ask permission to myServer
-            //AuthorizationRequest requestToSend = new AuthorizationRequest(fileName, FileModifier.WRITE);
+            AuthorizationRequest requestToSend = new AuthorizationRequest(fileName, FileModifier.WRITE);
             //myServer.tell(requestToSend, getSelf());
             System.out.println("File sending disabled");
         } else {
             getSelf().tell("echo", getSelf());
         }
     }
+
+
+/*
+************ DOCUMENTATION START ************
+
+ - Client Class local variabile:
+    + boolean IOError 
+        this variabile is setted to true if the Client ask a file, start
+        receiving it, but an IO error arise. We are not intrested in handling
+        the particular error, it is enought for us to comunicate the 
+        transfer failure and close the connection with a TcpMessage.Close().
+        In the connectionClosed handling, we will use this variabile to 
+        understand if there was an error during the file receiving or not.
+
+
+************ DOCUMENTATION END ************
+************ TO DO START ************
+
+Messages sent to clusterListener are to be sent to GUI instead.
+ 
+Delete "Out" concatenation to fileName of received files.
+
+Choose whether to handler or not not enought space available ON THE PC 
+    - this can be done looking at isPeerClosed()
+
+Ask to the collegue who is in charghe to remember node's free space.
+Big problem: what if I am receiving a file, and in the while a member of the cluster,
+looking at my (not updated) available space, think I am the node with the more free space
+and send me a file. Well, here arise the fact I don't remember how to free space is propagated.
+However, is would be sufficient to tell, as soon as I start making a request of a file, 
+propagating the info "my occupied space is <previous occupied space + file requested size>";
+Then, periodically the available space is propagated, so even if the transfer is not successfull,
+soon or later the world will know my true occupied space
+     From this viewpoint, it would be very useful Francesco's idea to comunicate, along with
+who have a file corresponding to a certaing tag, the space occupied by this file:
+in this way the node may, as soon as he choose to request a selected file, increase his occupied
+space of that quantity, and communicate his new available space to the cluster.
+if in a second moment he discover the transfer wasn-t successfully for some reason,
+he can just subtract that space (in the fileResult message, it would be useful to say also the file dim
+The client should have a "fileSize" variabile, used both for communicating the size of the
+received file and for show the progress bar.
+
+************ TO DO END ************
+*/
+
+
+
+
     
     // ----------------------------------- //
     // ---- CONNECTION ENSTABLISHMENT ---- //

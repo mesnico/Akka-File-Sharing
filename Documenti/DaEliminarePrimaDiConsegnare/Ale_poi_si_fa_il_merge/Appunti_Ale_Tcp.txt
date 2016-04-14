@@ -1,3 +1,15 @@
+Cose da aggiungere:
+Quando richiedo un file, nella ricerca mi verrà data anche la dimensione;
+Se nel mentre stavo ricevendo un file per il load balancing, all'inizio di questa ricezione avrò
+pre-allocato lo spazio occupato dal file che sto ricevendo;
+Quando nella schermata della ricerca 
+
+
+
+
+
+
+
 TO DO:
 
 0.2) non mi è riuscito gestire le eccezioni che avvengono quando si tenta di aprire un file che non c'è 
