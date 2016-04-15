@@ -1,3 +1,10 @@
+Alla fine la soluzione è:
+quando un nodo esce dal cluster dà via i suoi file, a meno che non sia l'ultimo nodo rimasto o che il nodo con più spazio
+disponibile abbia spazio negativo.
+
+Per quanto riguarda il manager della sincronizzazione, si fanno le preallocazioni ma le info al cluster vengono
+mandate solo alla fine se tutto è andato bene.
+
 // --- RIEPILOGO, SALTALO PURE SE TI RICORDI IL CONTESTO --- //
 
 Il programma è pensato per essere utilizzato all'interno di un'azienda, che vuole che più pc possano accedere 

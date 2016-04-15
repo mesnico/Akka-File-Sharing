@@ -54,7 +54,7 @@ public class Client extends UntypedActor {
     public void preStart() throws Exception {
         if(behavior == TcpBehavior.SEND_FILE){
             //I will send a file: before this, I have to ask permission to myServer
-            AuthorizationRequest requestToSend = new AuthorizationRequest(fileName, FileModifier.WRITE);
+            Handshake requestToSend = new Handshake(fileName, FileModifier.WRITE);
             //myServer.tell(requestToSend, getSelf());
             System.out.println("File sending disabled");
         } else {

@@ -67,8 +67,8 @@ public class Server extends UntypedActor {
         // ---- SERVER GENERAL BEHAVIOR ---- //
         // --------------------------------- //
         // --- AUTHORIZATION REQUEST --- //
-        else if (msg instanceof AuthorizationRequest){
-            AuthorizationRequest receivedRequest = (AuthorizationRequest)msg;
+        else if (msg instanceof Handshake){
+            Handshake receivedRequest = (Handshake)msg;
             
             System.out.printf("I've received a %s request on file %s\n",
                     receivedRequest.getModifier(),receivedRequest.getFileName());
