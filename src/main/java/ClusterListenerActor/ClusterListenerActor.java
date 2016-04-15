@@ -246,7 +246,7 @@ public class ClusterListenerActor extends UntypedActor {
             
             //if the tag exists on this node, it is sent; otherwise the search query is ignored
             if(requested!=null){
-                getSender().tell(new TagSearchResponse(infoTable.getByTag(tsr.getTag())), getSelf());
+                getSender().tell(new TagSearchResponse(requested), getSelf());
             }
             
         } else if (message instanceof TagSearchResponse){

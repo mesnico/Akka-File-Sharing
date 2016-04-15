@@ -1,10 +1,10 @@
 package GUI;
 
-import GUI.messages.SendModifyRequest;
-import FileTransfer.FileModifier;
 import GUI.messages.SearchRequest;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.ResourceBundle;
+import javafx.collections.FXCollections;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -32,25 +32,46 @@ public class FXMLMainController implements Initializable {
     @FXML
     private void modify(ActionEvent event) {
         System.out.println("You clicked Modify!");
-        
-        /* verify if the file is aviable
         FileEntry row = table.getSelectionModel().getSelectedItem();
-        GuiActor.getClusterListenerActorRef().tell(new SendModifyRequest(row.getName(), row.getOwner(), FileModifier.WRITE), GuiActor.getGuiActorRef());
-        */
-        
-        //this has to be done in another message...
-        //createStage("Modify",true);
+        if(row != null){
+            System.out.println(row);
+            /* verify if the file is aviable
+            GuiActor.getClusterListenerActorRef().tell(new SendModifyRequest(row.getName(), row.getOwner(), FileModifier.WRITE), GuiActor.getGuiActorRef());
+            */
+
+            //this has to be done in another message...
+            //createStage("Modify",true);
+
+        } else {
+            Alert alert = new Alert(AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText("Void Modify");
+            alert.setContentText("You have to select an element of the table after performing a search!");
+
+            alert.showAndWait();
+        }
     }
     
     @FXML
     private void read(ActionEvent event) {
         System.out.println("You clicked Read!");
-        /* verify if the file is aviable
         FileEntry row = table.getSelectionModel().getSelectedItem();
-        GuiActor.getClusterListenerActorRef().tell(new SendModifyRequest(row.getName(), row.getOwner(), FileModifier.READ), GuiActor.getGuiActorRef());
-        */
-        
-        //receive it if not busy
+        if(row != null){
+            System.out.println(row);
+            /* verify if the file is aviable
+            FileEntry row = table.getSelectionModel().getSelectedItem();
+            GuiActor.getClusterListenerActorRef().tell(new SendModifyRequest(row.getName(), row.getOwner(), FileModifier.READ), GuiActor.getGuiActorRef());
+            */
+
+            //receive it if not busy
+        } else {
+            Alert alert = new Alert(AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText("Void Read");
+            alert.setContentText("You have to select an element of the table after performing a search!");
+
+            alert.showAndWait();
+        }
     }
     
     @FXML
@@ -81,6 +102,10 @@ public class FXMLMainController implements Initializable {
         String searchText = search.getText();
         label.setText(searchText);
         if(!searchText.isEmpty()){
+            //empty the table to reset result in case of 0 matches
+            //more in detail: TagSearchResponse is not sent to clusterListener, who do not send the (void) list to guiActor
+            getTable().setItems(FXCollections.observableList(new ArrayList<FileEntry>()));
+            
             //require the file
             /*
             SearchFile message = new SearchFile(filter(search.getText()));//filter is a function that help to check the correctness of the search
