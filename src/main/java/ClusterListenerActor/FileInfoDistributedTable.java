@@ -53,9 +53,8 @@ public class FileInfoDistributedTable {
         return fileInfo.get(tag).remove(toDelete);
     }*/
     
-    /*if the tag exists, update it; otherwise, create it.
-    This method returns true if the tag was found; if the tag was created because it wasn't present, returns false.
-    */
+    //This method update the tag if the is was found, and return true;
+    //else if the tag wasn't present, it is created and returns false.
     public boolean updateTag(String tag, String fileName, BigInteger newOwnerId){
         FileInfoElement toUpdate = existsFile(tag,fileName);
         if(toUpdate == null){
@@ -67,7 +66,7 @@ public class FileInfoDistributedTable {
         }
     }
     
-    //very similar to updateTag except for the fact that if the file already exists, it is not created
+    //Very similar to updateTag except for the fact that if the file already exists, it is not updated
     public boolean testAndSet(String tag, String fileName, BigInteger ownerId){
         FileInfoElement toCreate = existsFile(tag,fileName);
         if(toCreate == null){
@@ -77,15 +76,10 @@ public class FileInfoDistributedTable {
         return false;        
     }
     
-    //construct the FileInfoTransfer for current node id. Tags resident on that node,infact, must be transferred.
+    //Construct the FileInfoTransfer for current node id.
+    //Tags resident on that node,infact, must be transferred.
     FileInfoTransfer buildFileInfoTransfer(HashMembersData membersMap, BigInteger nodeId){
-        //WRONG CODEEEE
-        /*for(String tag: infoTable.allTags()){
-            if(membersMap.getResponsibleById(computeId(tag)) !=
-                computeId(getAddress(getSelf().path().address()))){
-                fit.addEntry(tag,infoTable.removeByTag(tag));
-            }
-        }*/
+        
         FileInfoTransfer fit = new FileInfoTransfer();
         for(Iterator<HashMap.Entry<String,List<FileInfoElement>>>it=fileInfo.entrySet().iterator();it.hasNext();){
             HashMap.Entry<String, List<FileInfoElement>> entry = it.next();
