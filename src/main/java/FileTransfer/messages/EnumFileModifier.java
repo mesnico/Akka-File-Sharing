@@ -1,4 +1,4 @@
-package FileTransfer;
+package FileTransfer.messages;
 
 /*
  * To change this license header, choose License Headers in Project Properties.
@@ -10,7 +10,7 @@ package FileTransfer;
  *
  * @author Alessandro
  */
-public enum FileModifier {
+public enum EnumFileModifier {
     READ, WRITE;
 }
 

@@ -1,4 +1,4 @@
-package FileTransfer;
+package FileTransfer.messages;
 
 import java.io.Serializable;
 
@@ -13,29 +13,28 @@ import java.io.Serializable;
  * @author Alessandro
  */
 
-
 public class FileTransferResult implements Serializable {
-    private MessageType msg;
+    private EnumEnding msg;
     private String fileName;
-    private FileModifier modifier;
+    private EnumFileModifier modifier;
     
-    public FileTransferResult(MessageType msg){
+    public FileTransferResult(EnumEnding msg){
         this.msg = msg;
         this.fileName = "";
     }
     
-    public FileTransferResult(MessageType msg, String fileName){
+    public FileTransferResult(EnumEnding msg, String fileName){
         this.msg = msg;
         this.fileName = fileName;
     }
     
-    public FileTransferResult(MessageType msg, String fileName, FileModifier modifier){
+    public FileTransferResult(EnumEnding msg, String fileName, EnumFileModifier modifier){
         this.msg = msg;
         this.fileName = fileName;
         this.modifier = modifier;
     }
     
-    public MessageType getMessageType(){
+    public EnumEnding getMessageType(){
         return msg;
     }
     
@@ -43,7 +42,7 @@ public class FileTransferResult implements Serializable {
         return fileName;
     }
     
-    public FileModifier getFileModifier(){
+    public EnumFileModifier getFileModifier(){
         return modifier;
     }
 }

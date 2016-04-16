@@ -1,6 +1,7 @@
-package ClusterListenerActor.messages;
+package FileTransfer.messages;
 
 
+import ClusterListenerActor.messages.*;
 import java.io.Serializable;
 
 /*
@@ -13,9 +14,9 @@ import java.io.Serializable;
  *
  * @author nicky
  */
-public class FreeSpaceSpread implements Serializable{
+public class SendFreeSpaceSpread implements Serializable{
     long freeByteSpace;
-    public FreeSpaceSpread(long freeByteSpace){
+    public SendFreeSpaceSpread(long freeByteSpace){
         this.freeByteSpace = freeByteSpace;
     }
     

@@ -1,22 +1,35 @@
-package FileTransfer;
+package FileTransfer.messages;
+
 import java.io.Serializable;
 
-enum Behavior{
-    SEND, REQUEST, UNINITIALIZED;
-}
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+/**
+ *
+ * @author Alessandro
+ */
 
 public class Handshake implements Serializable {
-    private Behavior behavior;
+    private EnumBehavior behavior;
     private String fileName;
-    private FileModifier modifier;
+    private EnumFileModifier modifier;
     
-    public Handshake(Behavior behavior, String fileName, FileModifier modifier){
+    public Handshake(EnumBehavior behavior, String fileName){
         this.behavior = behavior;
         this.fileName = fileName;
+        this.modifier = EnumFileModifier.WRITE;
+    }   
+    
+    public Handshake(EnumBehavior behavior, String fileName, EnumFileModifier modifier){
+        this(behavior, fileName);        
         this.modifier = modifier;
     }   
     
-    public FileModifier getModifier(){
+    public EnumFileModifier getModifier(){
         return modifier;
     }
     
@@ -24,7 +37,12 @@ public class Handshake implements Serializable {
         return fileName;
     }
     
-    public Behavior getBehavior(){
+    public EnumBehavior getBehavior(){
         return behavior;
     }
+    
+    public void setBehavior(EnumBehavior behavior){
+        this.behavior = behavior;
+    }
+            
 }
