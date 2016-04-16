@@ -35,10 +35,8 @@ public class FXMLMainController implements Initializable {
         FileEntry row = table.getSelectionModel().getSelectedItem();
         if(row != null){
             System.out.println(row);
-            /* verify if the file is aviable
-            GuiActor.getClusterListenerActorRef().tell(new SendModifyRequest(row.getName(), row.getOwner(), FileModifier.WRITE), GuiActor.getGuiActorRef());
-            */
-
+            //GuiActor.getClusterListenerActorRef().tell(new SendModifyRequest(row.getName(), row.getOwner(), FileModifier.WRITE), GuiActor.getGuiActorRef());
+            
             //this has to be done in another message...
             //createStage("Modify",true);
 
@@ -58,10 +56,7 @@ public class FXMLMainController implements Initializable {
         FileEntry row = table.getSelectionModel().getSelectedItem();
         if(row != null){
             System.out.println(row);
-            /* verify if the file is aviable
-            FileEntry row = table.getSelectionModel().getSelectedItem();
-            GuiActor.getClusterListenerActorRef().tell(new SendModifyRequest(row.getName(), row.getOwner(), FileModifier.READ), GuiActor.getGuiActorRef());
-            */
+            //GuiActor.getClusterListenerActorRef().tell(new SendModifyRequest(row.getName(), row.getOwner(), FileModifier.READ), GuiActor.getGuiActorRef());
 
             //receive it if not busy
         } else {

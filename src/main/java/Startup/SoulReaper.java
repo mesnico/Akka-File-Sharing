@@ -18,7 +18,7 @@ import java.util.List;
  * @author nicky
  */
 public class SoulReaper extends UntypedActor{
-    List<ActorRef> watchedActors = new ArrayList<ActorRef>(5);
+    List<ActorRef> watchedActors = new ArrayList<>(5);
     LoggingAdapter log = Logging.getLogger(getContext().system(), this);
     
     @Override

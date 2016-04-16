@@ -12,7 +12,7 @@ import java.io.Serializable;
  * @author nicky
  */
 public class SearchRequest implements Serializable{
-    private String searchString;
+    private final String searchString;
 
     public SearchRequest(String searchString) {
         this.searchString = searchString;

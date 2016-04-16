@@ -42,7 +42,7 @@ public class FXMLCreateController implements Initializable {
         file_name.setText(newFileName);
         if(!newFileName.isEmpty()){
             System.out.println("You clicked Create into the new window!");
-            System.out.println("You clicked Modify!");
+            System.out.println("Started create request");
             
             //set the ModifiedFile
             List<String> tags = new ArrayList<>();

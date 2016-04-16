@@ -11,6 +11,7 @@ import javafx.stage.WindowEvent;
 
 
 public class GUI extends Application {
+    //this structure is needed to store name and tags of the file under modify (creazione)
     static public class ModifiedFile{
         private static String fileName;
         private static List<String> tags;
