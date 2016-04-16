@@ -1,5 +1,10 @@
 package FileTransfer;
 
+import FileTransfer.messages.EnumFileModifier;
+import FileTransfer.messages.EnumAuthorizationReply;
+import FileTransfer.messages.AuthorizationReply;
+import FileTransfer.messages.FileTransferResult;
+import FileTransfer.messages.Handshake;
 import java.net.InetSocketAddress;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
@@ -25,7 +30,7 @@ public class Client extends UntypedActor {
     //final ActorSelection myServer;
     String fileName, behaviorString;
     TcpBehavior behavior;
-    FileModifier readOrWrite;
+    EnumFileModifier readOrWrite;
     FileOutputStream output;
     EnumAuthorizationReply reply;
     long fileLength;
@@ -40,12 +45,12 @@ public class Client extends UntypedActor {
         this.fileName = fileName;
         this.behavior = behavior;
         this.fileLength = 0;
-        this.readOrWrite = FileModifier.WRITE;
+        this.readOrWrite = EnumFileModifier.WRITE;
         this.IOError = false;
     }
     
     public Client(InetSocketAddress remote, ActorRef listener, String fileName, TcpBehavior behavior, 
-            FileModifier readOrWrite) {        
+            EnumFileModifier readOrWrite) {        
         this(remote, listener, fileName, behavior);
         this.readOrWrite = readOrWrite;  
     }
@@ -54,7 +59,7 @@ public class Client extends UntypedActor {
     public void preStart() throws Exception {
         if(behavior == TcpBehavior.SEND_FILE){
             //I will send a file: before this, I have to ask permission to myServer
-            Handshake requestToSend = new Handshake(fileName, FileModifier.WRITE);
+            Handshake requestToSend = new Handshake(fileName, EnumFileModifier.WRITE);
             //myServer.tell(requestToSend, getSelf());
             System.out.println("File sending disabled");
         } else {
@@ -131,7 +136,7 @@ received file and for show the progress bar.
             final ActorRef connectionHandler = getSender();
             if (msg instanceof CommandFailed) {
                 if (behavior == TcpBehavior.REQUEST_FILE){
-                    clusterListener.tell(new FileTransferResult(MessageType.CONNECTION_FAILED), getSelf());
+                    clusterListener.tell(new FileTransferResult(Ending.CONNECTION_FAILED), getSelf());
                 }
                 getContext().stop(getSelf());
             } else if (msg instanceof Connected) {
@@ -177,7 +182,7 @@ received file and for show the progress bar.
                         connectionHandler.tell(TcpMessage.close(), getSelf());
                         break;
                     case SEND_NAME_OF_REQUESTED_FILE:
-                        String modifier = (readOrWrite == FileModifier.READ) ? "r" : "w";
+                        String modifier = (readOrWrite == EnumFileModifier.READ) ? "r" : "w";
                         ByteString modifierAndFileName = ByteString.fromString(modifier.concat(fileName));
                         connectionHandler.tell(TcpMessage.write(modifierAndFileName), getSelf());
                         behavior = TcpBehavior.AUTHORIZATION_REPLY_HANDLE;
@@ -198,13 +203,13 @@ received file and for show the progress bar.
                                 break;
                             case FILE_NOT_EXISTS:
                                 clusterListener.tell(new FileTransferResult(
-                                        MessageType.FILE_NOT_EXISTS, fileName), getSelf());
+                                        Ending.FILE_NOT_EXISTS, fileName), getSelf());
                                 connectionHandler.tell(TcpMessage.close(), getSelf());
                                 System.out.println("[client]: file_not_exists\n");
                                 break;
                             case FILE_BUSY:
                                 clusterListener.tell(new FileTransferResult(
-                                        MessageType.FILE_BUSY, fileName), getSelf());
+                                        Ending.FILE_BUSY, fileName), getSelf());
                                 connectionHandler.tell(TcpMessage.close(), getSelf());
                                 System.out.println("[client]: file_busy\n");
                                 break;
@@ -243,7 +248,7 @@ received file and for show the progress bar.
                     if(behavior == TcpBehavior.SEND_FILE || behavior == TcpBehavior.SEND_FILENAME ||
                             behavior == TcpBehavior.SEND_FILE_NOW){
                         clusterListener.tell(new FileTransferResult(
-                                    MessageType.FILE_SENDING_FAILED), getSelf());
+                                    Ending.FILE_SENDING_FAILED), getSelf());
                         //myServer.tell(new FileTransferResult(
                           //      MessageType.FILE_NO_MORE_BUSY, fileName, readOrWrite), getSelf());
                     } else{
@@ -263,7 +268,7 @@ received file and for show the progress bar.
                             }
                         }
                         clusterListener.tell(new FileTransferResult(
-                                MessageType.FILE_RECEIVING_ERROR, fileName),getSelf());                    
+                                Ending.FILE_RECEIVING_ERROR, fileName),getSelf());                    
                     }
                 } else{ 
                 //sarebbe la connectionClosed
@@ -290,7 +295,7 @@ received file and for show the progress bar.
                               //      MessageType.FILE_RECEIVED_SUCCESSFULLY, fileName, readOrWrite), 
                                 //    getSelf());
                             clusterListener.tell(new FileTransferResult(
-                                    MessageType.FILE_RECEIVED_SUCCESSFULLY, fileName, readOrWrite), 
+                                    Ending.FILE_RECEIVED_SUCCESSFULLY, fileName, readOrWrite), 
                                     getSelf());
                             }
                         }

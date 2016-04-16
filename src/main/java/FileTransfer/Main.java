@@ -1,5 +1,6 @@
 package FileTransfer;
 
+import FileTransfer.messages.EnumFileModifier;
 import akka.actor.ActorSystem;
 import akka.actor.Props;
 import com.typesafe.config.Config;
@@ -52,7 +53,7 @@ public class Main {
                 InetSocketAddress remote = new InetSocketAddress(address,5678);
                 
                 final ActorRef tcpClient = system.actorOf(Props.create(Client.class, 
-                        remote, clusterListener, "inputFile.txt", TcpBehavior.REQUEST_FILE, FileModifier.WRITE),
+                        remote, clusterListener, "inputFile.txt", TcpBehavior.REQUEST_FILE, EnumFileModifier.WRITE),
                         "tcpClient"+port);
                 
 

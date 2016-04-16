@@ -5,7 +5,13 @@
  */
 package FileTransfer;
 
+import FileTransfer.messages.EnumFileModifier;
+import FileTransfer.messages.AuthorizationReply;
+import FileTransfer.messages.EnumEnding;
+import FileTransfer.messages.EnumAuthorizationReply;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 /**
  *
@@ -15,10 +21,12 @@ import java.util.HashMap;
 class FileElement{
     private boolean occupied;
     private long size;
+    private List<String> tags;
 
-    public FileElement(boolean occupied, long size) {
+    public FileElement(boolean occupied, long size, List<String> tags) {
         this.occupied = occupied;
         this.size = size;
+        this.tags = tags;
     }
     
     public boolean isOccupied() {
@@ -28,13 +36,13 @@ class FileElement{
     public void setOccupied(boolean occupied) {
         this.occupied = occupied;
     }
-    
-    public void setFree(boolean free){
-        this.occupied = free;
-    }
 
     public long getSize() {
         return size;
+    }
+    
+    public List<String> getTags(){
+        return tags;
     }
 }
 
@@ -55,21 +63,20 @@ public class FileTable {
     }
     
     //returns false if the fileName doesn't exists.
-    public boolean deleteEntry(String fileName){
+    public FileElement deleteEntry(String fileName){
         FileElement e = fileTable.remove(fileName);
-        if(e==null) return false;
-        return true;
+        return e;
     }
     
     public boolean freeEntry(String fileName){
         FileElement e = fileTable.get(fileName);
         if(e == null) return false;
-        fileTable.get(fileName).setFree(true);
+        fileTable.get(fileName).setOccupied(false);
         return true;
     }
     
     //check if a file exists in the table
-    public AuthorizationReply testAndSet(String fileName, FileModifier readOrWrite){
+    public AuthorizationReply testAndSet(String fileName, EnumFileModifier readOrWrite){
         if(!fileTable.containsKey(fileName)){
             System.out.println("[fileTable]: sono nella testAndSet, sto per restituire FILE_NOT_EXISTS");
             return new AuthorizationReply(EnumAuthorizationReply.FILE_NOT_EXISTS);
@@ -77,7 +84,7 @@ public class FileTable {
             System.out.println("[fileTable]: sono nella testAndSet, sto per restituire FILE_BUSY");
             return new AuthorizationReply(EnumAuthorizationReply.FILE_BUSY);
         } else {
-            if(readOrWrite == FileModifier.WRITE){
+            if(readOrWrite == EnumFileModifier.WRITE){
                 System.out.println("[fileTable]: sono nella testAndSet, sto per marcare il file come occupato");
                 fileTable.get(fileName).setOccupied(true);
             }
@@ -92,6 +99,12 @@ public class FileTable {
         }
         return sum;
     }
+    
+    /*
+    public long getFileSize(String fileName){
+        return fileTable.get(fileName).getSize();
+    }
+    */
     
     @Override
     public String toString(){
