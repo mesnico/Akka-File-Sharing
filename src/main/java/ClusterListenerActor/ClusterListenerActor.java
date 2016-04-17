@@ -14,6 +14,7 @@ import GUI.messages.SearchRequest;
 import GUI.messages.SendCreationRequest;
 import Startup.AddressResolver;
 import Startup.WatchMe;
+import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
 import akka.actor.Address;
 import akka.actor.PoisonPill;
@@ -27,6 +28,8 @@ import akka.cluster.ClusterEvent.MemberUp;
 import akka.cluster.ClusterEvent.UnreachableMember;
 import akka.cluster.Member;
 import akka.cluster.MemberStatus;
+import akka.cluster.pubsub.DistributedPubSub;
+import akka.cluster.pubsub.DistributedPubSubMediator;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import java.math.BigInteger;
@@ -54,6 +57,7 @@ public class ClusterListenerActor extends UntypedActor {
     FoundFiles foundFiles;
     String localAddress;
     ActorSelection guiActor,soulReaper;
+    ActorRef mediator;
     
     int clusterSystemPort;
     final long myFreeSpace = new Random().nextLong();    //THIS IS GENERATED INTERNALLY BUT IT SHOULD NOT (should be taken from mine file table)
@@ -81,6 +85,12 @@ public class ClusterListenerActor extends UntypedActor {
                 MemberEvent.class, UnreachableMember.class);
         //#subscribe
         
+        //subscribe to the freeSpaceTopic
+        mediator
+            = DistributedPubSub.get(getContext().system()).mediator();
+        mediator.tell(new DistributedPubSubMediator.Subscribe("freeSpaceTopic", getSelf()),
+                getSelf());
+        
         //create the references to the other actors
         soulReaper = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"+clusterSystemPort+"/user/soulReaper");
         guiActor   = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"+clusterSystemPort+"/user/gui");
@@ -97,7 +107,9 @@ public class ClusterListenerActor extends UntypedActor {
 
     @Override
     public void onReceive(Object message) throws Exception{
-        if (message instanceof MemberUp) {
+        if (message instanceof DistributedPubSubMediator.SubscribeAck){
+            log.info("Subscribed to freeSpace Topic");
+        } else if (message instanceof MemberUp) {
             MemberUp mMemberUp = (MemberUp) message;
             log.info("{} -->Member is Up: {}", localAddress, getAddress(mMemberUp.member().address()));
 
@@ -163,6 +175,12 @@ public class ClusterListenerActor extends UntypedActor {
                 }
             }
             log.info("membersMap initialized: {}",membersMap);
+        
+        } else if (message instanceof SendFreeSpaceSpread){
+            int freeByteSpace = (SendFreeSpaceSpread)message.getFreeByteSpace();
+            //tell my free space to all the other cluster nodes
+            mediator.tell(new DistributedPubSubMediator.Publish("freeSpaceTopic", new FreeSpaceSpread(freeByteSpace)),
+                getSelf());
             
         } else if (message instanceof FreeSpaceSpread){
             //insert the received information about the free space in the current priority queue.
