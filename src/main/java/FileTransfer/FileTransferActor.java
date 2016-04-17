@@ -1,7 +1,9 @@
 /******************************
- *  TODO: in the TcpReceived, we must decide what happen in case of IO error.
+ *  TODO: in the TcpReceived, we must decide what happen in case of IO error, considerando
+ *  soprattutto che il caso di file_not_exists, per comodità, l'ho gestito con la terminate,
+ *  senza quindi mandare alcun messaggio di errore, che quindi per ora non esiste.
  *  (smarter opinion below --> below) 
- * In my opinion, it would be useful to send a FileTransferResult with the EnumEnding field
+ *  In my opinion, it would be useful to send a FileTransferResult with the EnumEnding field
  *  set to IO_ERROR: this way we could in a first moment send a receiverInterlocutor.tell(IO_ERROR, ...),
  *  and then call the terminate with FILE_RECEIVING_ERROR as argument.
  *  For uniformity, but losing something in readability, we could send FILE_RECEIVING_ERROR also
@@ -13,6 +15,10 @@
  * non arriverà. E' sufficiente mandare a se stessi una simpleAnswer
  * 
  * 3) nel Server bisogna ancora fare la allocationRequest
+ * 
+ * 4) uso spesso i membri dato dell'handshake: bisogna assicurarsi che siano sempre significativi
+ * 
+ * 5) guarare i vari TODO/check/Err sparsi nel testo
  ******************************/
 
 package FileTransfer;
@@ -256,6 +262,8 @@ public class FileTransferActor extends UntypedActor {
             public void rollBack(){
                 // --- We ask the server to deallocate fileEntry and corresponding space --- //
                 // --- Furthermore, we must delete the corrupted file --- //
+                // TODO forse questa cosa di cancellare il file dovrebbe farla il server, per
+                // coerenza? anche se non ci sarebbero comunque problemi
                 File corruptedFile = new File(handshake.getFileName());
                 if(corruptedFile.exists() && corruptedFile.canWrite()){
                     corruptedFile.delete();
@@ -292,22 +300,32 @@ public class FileTransferActor extends UntypedActor {
                             terminate(EnumEnding.FILE_BUSY);
                             break;
                         case AUTHORIZATION_GRANTED:
-                            // --- The AllocationRequest is sended also if the request is a READ: --- //
-                            // --- in this case, the server will surely have enought space and accept --- //
+                            // --- if the request is a READ, the server is not required to store         --- //
+                            // --- the file in the fileTable, so there is no need to ask him permission. --- //
+                            // --- Of course, we must create outself a reply for the interlocutor        --- //
                             if(handshake.getModifier() == EnumFileModifier.WRITE){
                                 size = reply.getSize();
                                 AllocationRequest request = new AllocationRequest(
                                         handshake.getFileName(), size, reply.getTags());
                                 myServer.tell(request, getSelf()); 
                                 if (size == 0){
+                                    // --- special case: create the file and end the protocol --- //
+                                    // --- in the close() handling the guiActor               --- //
+                                    // --- will be informed of the success                    --- //
+                                    // TODO: creare il file. Si fa così? (ho letto di altri modi)
+                                    // TODO: tra l'altro, essendo in lettura, va messo nei file temporanei
+                                    output = new FileOutputStream(handshake.getFileName());
                                     connectionHandler.tell(TcpMessage.close(), getSender()); //magari dovremmo gesrtire il fatto che, se la dimensione era 0, non aggiorniamo lo spazio nella fileTable
                                 }
                             } else {  
                                 // --- READ request: we will give the permission without asking the server --- //
                                 if (size == 0){
                                     //caso un po' particolare: bisogna creare un file nuovo e concludere
+                                    output = new FileOutputStream(handshake.getFileName());
                                     connectionHandler.tell(TcpMessage.close(), getSender()); //magari dovremmo gesrtire il fatto che, se la dimensione era 0, non aggiorniamo lo spazio nella fileTable
                                 } else {
+                                    // --- we have to create the output stream since from here --- //
+                                    // --- we will jump directly in the receiving stage        --- //
                                     output = new FileOutputStream(handshake.getFileName()); //TODO: non dovrebbe sollevare eccezioni, vedi documentazione  
                                     SimpleAnswer answer = new SimpleAnswer(true);
                                     receiverInterlocutor.tell(answer, getSelf());
@@ -319,6 +337,13 @@ public class FileTransferActor extends UntypedActor {
                     SimpleAnswer answer = (SimpleAnswer)msg;
                     receiverInterlocutor.tell(answer, getSelf());
                     if(answer.getAnswer() == false){
+                        // TODO: qui forse occorrerebbe, più che file_receiving_failed, 
+                        // un più specifico "NOT_ENOUGHT_SPACE", in modo che nella gui
+                        // sia possibile visualizzare tale messaggio.
+                        // dalla terminate, questo messaggio verrà poi inoltrato
+                        // alla roll back, che manderà un generico file_receiving_error
+                        // al server, che in risposta a questo proverà a deallocare la
+                        // entry, ma non ci saranno problemi perchè tale entry non sarà presente.
                         terminate(EnumEnding.FILE_RECEIVING_FAILED);
                     } else {
                         output = new FileOutputStream(handshake.getFileName()); //TODO: non dovrebbe sollevare eccezioni, vedi documentazione  
@@ -328,7 +353,7 @@ public class FileTransferActor extends UntypedActor {
                         try{
                             output.write(buffer.array());
                         } catch (Exception e){
-                            //see TODO at the file beginning
+                            //see TODO at the file beginning (IO ERROR)
                             terminate(EnumEnding.FILE_RECEIVING_FAILED);
                         }
                 } else if(msg instanceof CommandFailed) {
@@ -341,6 +366,9 @@ public class FileTransferActor extends UntypedActor {
                     } else {
                         //all went the right direction: communicate to the clusterListener...
                         output.close(); //TODO: Throws IOException if an I/O error occurs. In case of exception, rollBack etc.
+                        FileTransferResult result = new FileTransferResult(
+                                EnumEnding.FILE_RECEIVED_SUCCESSFULLY, handshake.getFileName(), handshake.getModifier());
+                        myGuiActor.tell(result, getSelf());
                     }
                 }
             }
