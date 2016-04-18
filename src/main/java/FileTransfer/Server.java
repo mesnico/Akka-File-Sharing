@@ -11,9 +11,7 @@ package FileTransfer;
 
 import FileTransfer.messages.AllocationRequest;
 import FileTransfer.messages.EnumFileModifier;
-import FileTransfer.messages.AuthorizationReply;
 import FileTransfer.messages.FileTransferResult;
-import FileTransfer.messages.Handshake;
 import FileTransfer.messages.SendFreeSpaceSpread;
 import FileTransfer.messages.SimpleAnswer;
 import Startup.AddressResolver;
@@ -32,6 +30,7 @@ import akka.io.Tcp.Connected;
 import akka.io.TcpMessage;
 import java.io.File;
 import java.net.InetAddress;
+import java.util.ArrayList;
 
 
 public class Server extends UntypedActor {
@@ -44,9 +43,9 @@ public class Server extends UntypedActor {
     final String filePath = Configuration.getFilePath();
     final String tmpFilePath = Configuration.getTmpFilePath();
     
-    public Server(int basePort) {
-        clusterSystemPort = basePort;
-        tcpPort = basePort + 1;
+    public Server(int clusterSystemPort, int tcpPort) {
+        this.clusterSystemPort = clusterSystemPort;
+        this.tcpPort = tcpPort;
         // TODO: the server, at boot time, has to read from the fileTable stored on disk
         // which file it has, insert them in his fileTable, and calculate his freeSpace.
         myFreeSpace = Configuration.getMaxByteSpace();
@@ -64,9 +63,11 @@ public class Server extends UntypedActor {
                     new InetSocketAddress(InetAddress.getLocalHost(), tcpPort), 
                     100)
                 , getSelf());
-        //FileElement newElement = new FileElement(false, 1);
-        //boolean ret = fileTable.createOrUpdateEntry("inputFile.txt", newElement);
-        //System.out.printf("[server]: createOrUpdateEntry restituisce %b\n", ret);
+        ArrayList<String> r = new ArrayList<>();
+        r.add("ciao");
+        FileElement newElement = new FileElement(false, 1, r);
+        boolean ret = fileTable.createOrUpdateEntry("inputFile.txt", newElement);
+        System.out.printf("[server]: createOrUpdateEntry restituisce %b\n", ret);
     }
      
     // -------------------------------- //
@@ -85,7 +86,8 @@ public class Server extends UntypedActor {
             InetSocketAddress remoteAddress = conn.remoteAddress();
             myClusterListener.tell(conn, getSelf()); //Are we interested in this? (a client connected to us)
             final ActorRef handler = getContext().actorOf(
-                Props.create(FileTransferActor.class, clusterSystemPort, remoteAddress, getSender()));
+                Props.create(FileTransferActor.class, clusterSystemPort, 
+                    /*remoteAddress.getAddress().getHostAddress(),*/ getSender()));
             getSender().tell(TcpMessage.register(handler), getSelf());
         }
         

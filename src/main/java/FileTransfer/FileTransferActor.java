@@ -1,5 +1,17 @@
 /******************************** 
- * 5) guarare i vari TODO/check/Err sparsi nel testo
+ * -  guarare i vari TODO/check/Err sparsi nel testo
+ * 
+ * Ci sono alcuni problemi se il sender crasha fra quando è stato stabilito il protocollo e quando
+ * fa la richiesta al suo server: se il file che voleva mandare in quel momento era occupato da
+ * un altro nodo, quando l'interlocutor crasha viene chiamata la terminate e poi la rollBack.
+ * Il problema è che la rollBack libererà il file, nonostante non sia occupato da me!
+ * una semplice soluzione è fare che ogni fileElement, oltre a memorizzare se il file è occupato,
+ * memorizzi anche DA CHI è occupato, in modo che le "free" vengano accettate solo se
+ * l'issuer è il nodo che ha occupato il file. Il server può sapere chi ha mandato il
+ * FileTransferResult facendo getSender(). Cioè il server dovrebbe fare:
+ * if <file è occupato>, if <fileOccupier == getSender()>, allora libera il file.
+ * Magari all'avvio dell'applicazione liberiamo tutti i file.
+ * 
  ******************************/
 
 package FileTransfer;
@@ -32,6 +44,7 @@ import akka.io.TcpMessage;
 import akka.japi.Procedure;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -48,10 +61,10 @@ public class FileTransferActor extends UntypedActor {
     ActorRef connectionHandler;
     Handshake handshake;
     int clusterSystemPort;
+    // --- tcpPort is used only when this FileTrransferActor is working as client
     int tcpPort;
-    String remoteServerIP;  
+    InetAddress remoteServerIp;  
     long size;
-    InetSocketAddress interlocutorAddress;
     FileOutputStream output;
     final String filePath = Configuration.getFilePath();
     final String tmpFilePath = Configuration.getTmpFilePath();
@@ -59,34 +72,45 @@ public class FileTransferActor extends UntypedActor {
     // ---------------------- //
     // ---- CONSTRUCTORS ---- //
     // ---------------------- //
-    public FileTransferActor(int basePort) {
-        this.clusterSystemPort = basePort;
-        this.tcpPort = basePort + 1;
-        handshake.setBehavior(EnumBehavior.UNINITIALIZED);
+    // --- Base constructor, always called. Size is initialized at 0 so that,
+    // --- if something goes wrong when the receiver has not asked yet to the server,
+    // --- the permission to receive the file, the rollBack procedure isn't dangerous 
+    // --- (e.g. it could try to free some space although no space was allocated
+    public FileTransferActor(int clusterListenerPort) {
+        this.clusterSystemPort = clusterListenerPort;
         size = 0;
-        //qui forse sarebbe da inizializzare behavior a "vuoto", in modo che
-        //il passivo, se va nella terminated quando non ha ancora ricevuto il filename, non fa danni
     }
     
-    // --- Constructor called by the asker --- //
-    public FileTransferActor(int basePort, Handshake handshake) {
-        this(basePort);
+    // --- Constructor called by the asker. The handshake variabile specify what the
+    // --- asker has to do (e.g. send a file or request a file). The remoteServerIp is the IP address
+    // --- of the server to which che asker will try to connect.
+    public FileTransferActor(int clusterListenerPort, InetAddress remoteServerIp, int tcpPort, Handshake handshake) {
+        this(clusterListenerPort);
+        this.tcpPort = tcpPort;
         this.handshake = handshake;
+        this.remoteServerIp = remoteServerIp;
     }
     
-    // --- Constructor called by the responder --- //
-    public FileTransferActor(int basePort, InetSocketAddress interlocutorAddress, ActorRef connectionHandler ) {
-        this(basePort);
-        this.interlocutorAddress = interlocutorAddress;
+    // --- Constructor called by the responder. The handshake variabile is also used to distinguish
+    // --- which part of the code the FileTransferActor has to execute (see preStart)
+    public FileTransferActor(int clusterListenerPort, /*InetAddress remoteServerIp,*/ ActorRef connectionHandler ) {
+        this(clusterListenerPort);
+        // ERR: remoteServerIp è un InetAddress, mentre nel server gli passiamo una stringa.
+        // L'unico punto dove pare essere necessario è quanto ricaviamo l'interlocutorSelection
+        handshake = new Handshake(EnumBehavior.UNINITIALIZED);
+        //this.remoteServerIp = remoteServerIp;
         this.connectionHandler = connectionHandler;
     }    
     
     // ----------------------------- //
     // ---- ADDITIONAL FUNCTION ---- //
     // ----------------------------- //
+    // --- This function is invoked both by the asker and by the responder, once the
+    // --- handshake.behavior variabile has been initialized, to change their own
+    // --- behavior to tcpSender or tcpReceiver.    
     public void changeBehavior(){
         if(handshake.getBehavior() == EnumBehavior.SEND){
-            // --- I enter in tcpSender behavior and tell myself to start the protocol --- //
+            // --- I change my behavior to tcpSender and I tell myself to start the protocol --- //
             getContext().become(tcpSender());  
             getSelf().tell("go", getSelf()); 
         } else {
@@ -110,17 +134,21 @@ public class FileTransferActor extends UntypedActor {
         switch(handshake.getBehavior()){
             case SEND:
             case REQUEST:
-                remoteServer = getContext().actorSelection("akka.tcp://ClusterSystem@"+remoteServerIP+":"
+                // --- I am the asker, so I have to connect to the remoteServer.
+                // --- The tcpManager does this for me.
+                remoteServer = getContext().actorSelection("akka.tcp://ClusterSystem@"+remoteServerIp.getHostAddress()+":"
                 +clusterSystemPort+"/user/server");
                 final ActorRef tcpManager = Tcp.get(getContext().system()).manager();
-                InetSocketAddress remoteServerAddress = new InetSocketAddress(remoteServerIP, tcpPort);
+                InetSocketAddress remoteServerAddress = new InetSocketAddress(remoteServerIp, tcpPort);
                 tcpManager.tell(TcpMessage.connect(remoteServerAddress), getSelf());
                 break;
             case UNINITIALIZED:
-                ActorSelection interlocutorSelection = getContext().actorSelection("akka.tcp://ClusterSystem@"+interlocutorAddress
-                        .getAddress().getHostAddress()+":"+clusterSystemPort+"/user/fileTransferSender"); 
+                // --- I am the responder, I was spawned by my server for handling an
+                // --- incoming connection. I'll ack the asker peer just to let him know my address
+                ActorSelection interlocutorSelection = getContext().actorSelection("akka.tcp://ClusterSystem@"+remoteServerIp.getHostAddress()+":"
+                        +clusterSystemPort+"/user/fileTransferSender"); 
                 FiniteDuration timeout = new FiniteDuration(10, SECONDS);
-                interlocutor = Await.result(interlocutorSelection.resolveOne(timeout), timeout); //Checl
+                interlocutor = Await.result(interlocutorSelection.resolveOne(timeout), timeout); //Check
                 interlocutor.tell("ack", getSelf());
                 log.debug("interlocutor actorRef is {}", interlocutor);
                 break;     
@@ -130,95 +158,116 @@ public class FileTransferActor extends UntypedActor {
     @Override
     public void onReceive(Object msg) {
         if (msg instanceof CommandFailed) {
+            // --- I am the asker. The connectionHandler tells me the connection enstablishment failed
             FileTransferResult result = new FileTransferResult(
                     EnumEnding.FILE_SENDING_FAILED, handshake.getFileName(), handshake.getModifier()); 
             myGuiActor.tell(result, getSelf()); //toCheck
             getSelf().tell(PoisonPill.getInstance(), getSelf());
+            log.error("Connection enstablishment with remote server failed");
         } else if (msg instanceof Connected) {
+            // --- I am the asker. The connectionHandler tells me the connection is enstablished
             connectionHandler = getSender();
             connectionHandler.tell(TcpMessage.register(getSelf()), getSelf());
+            log.info("Connection established with remote server");
         } else if (msg instanceof Ack){
+            // --- I am the asker. The responder have acked me, so that now I can reach him and tell
+            // --- him what I am willing to do (e.g sending him a file or requesting a file from him)
+            // --- Finally, I invoke changeBehavior() to became sender or receiver according to the
+            // --- handshake variabile that was given to me by the one who has created me
             interlocutor = getSender();
             interlocutor.tell(handshake, getSelf());
             getContext().watch(interlocutor);
             changeBehavior();
         } else if (msg instanceof Handshake){
+            // --- I am the responder. I've received the handshake variabile who tell me how
+            // --- I must set my behavior. The behavior changing is performed in the changeBehavior()
             this.handshake = (Handshake)msg;
             getContext().watch(interlocutor);
             changeBehavior();
         }
     }
     
-    // ------------------------- //
-    // ---- SENDER BEHAVIOR ---- //
-    // ------------------------- //    
+    // ----------------------------- //
+    // ---- TCP SENDER BEHAVIOR ---- //
+    // ----------------------------- //    
+    // --- Here is specified what the FileTransferActor, when he assume the role of tcpSender,
+    // --- has to do in response to the message that can arrive.
     private Procedure<Object> tcpSender() {
         return new Procedure<Object>() {
             private FileTransferResult result;
-            
+            // --- I am the sender, so in case of early interruption of the protocol,
+            // --- the only thing I have to do is to free the file I've marked as busy
+            // --- in prevision of sending it out. This is done by the server.
+            // --- The following function may be called also if the file was not marked as busy:
+            // --- this doesn't produce any harm           
             public void rollBack(){
-                //the file was marked as busy, it has to be set free
                 result = new FileTransferResult(
                         EnumEnding.FILE_NO_MORE_BUSY, handshake.getFileName());  
                 myServer.tell(result, getSelf());
             }
-            
+
+            // --- I am the sender, and I send to the guiActor the enumEnding msg that
+            // --- was passed to me, who specify why the protocol ended before the file
+            // --- was transferred. The guiActor will know what to do looking at msg.
+            // --- Then I invoke rollBack(), who make sure the file state remains
+            // --- consistent, and finally I send to my mailBox a PoisonPill.
+            // --- This kind of message is automatically handled terminating the actor            
             public void terminate(EnumEnding msg){
-                // --- I send the same error message to the interlocutor and --- //
-                // --- to the gui --- //
+                log.info("The protocol ended earlier then expected, so I'll do a roll back");
                 result = new FileTransferResult(
                         msg, handshake.getFileName(), handshake.getModifier());
                 myGuiActor.tell(result, getSelf());
-                /**********************************
-                 *  I enter here if 
-                 *  1) the interlocutor fall --> file_sending_failed (msg should not be sent to interlocutor)
-                 *  2) there is a file_not_exists error --> file_not_exists (msg should be sent to interlocutor)
-                 *  3) the received didn't give us the permission to send him a file --> file_sending_failer (msg should not be sent to interlocutor)
-                 **********************************/
-                
-                //interlocutor.tell(result, getSelf());
                 rollBack();
                 getSelf().tell(PoisonPill.getInstance(), getSelf());
             }
             
             @Override
             public void apply(Object msg) throws Exception {
+                // --- I receive the "go" message from myself, telling me to start the protocol
                 if(msg instanceof String){
-                    //The "go" message is arrived, telling me to start the protocol
                     myServer.tell(handshake, getSelf());    
+                // --- I receive the answer from myServer, who says if the file I have to send
+                // --- is busy, is available, or if it doesn't exists (this is an error)
                 } else if (msg instanceof AuthorizationReply){
                     AuthorizationReply reply = (AuthorizationReply)msg;
                     switch(reply.getResponse()){
+                        // --- The file I had to send doesn't exists. I forward the information
+                        // --- to the receiver, and terminate the protocol.
                         case FILE_NOT_EXISTS:
                             interlocutor.tell(reply, getSelf());
                             terminate(EnumEnding.FILE_NOT_EXISTS);
+                            log.error("The file {} I had to send doesn'n exists", handshake.getFileName());
                             break;
-                            //vedere se la busy si può uniformare con quella di sopra
+                        // --- In the following case I must not perform the rollBack, because
+                        // --- it frees the file I was trying to send, but in this case
+                        // --- that file is keept busy by someone different from me, so I must not free it.
+                        // --- There is no need to inform the guiActor: if a exitLoadBalancing
+                        // --- is happening, sending a FILE_SENDING_FAILED would cause the
+                        // --- guiActor to decrease the count of files to send, and we don't want this.
                         case FILE_BUSY:
                             interlocutor.tell(reply, getSelf());
-                            terminate(EnumEnding.FILE_SENDING_FAILED);
+                            getSelf().tell(PoisonPill.getInstance(), getSelf());
+                            log.info("The file {} I had to send is busy", handshake.getFileName());
                             break;
+                        // --- The file exists and I'm allowed to send it. I have to perform some checks
                         case AUTHORIZATION_GRANTED:
                             File fileToSend = new File(filePath + handshake.getFileName());
                             size = reply.getSize();
                             if (fileToSend.exists()&&fileToSend.canRead()){
                                 interlocutor.tell(reply, getSelf());
+                            // --- I enter the following branch if the file does exists but I couldn't 
+                            // --- open it. I cannot forward the AUTHORIZATION_GRANTED message received
+                            // --- from the server, we have to override it with a FILE_NOT_EXISTS message.
                             } else {
-                                // --- The file does exists but we couldn't open it.
-                                // --- So we cannot forward the AUTHORIZATION_GRANTED message received
-                                // --- from the server but we have to override it with a
-                                // --- a FILE_NOT_EXISTS
                                 reply = new AuthorizationReply(EnumAuthorizationReply.FILE_NOT_EXISTS);
                                 interlocutor.tell(reply, getSelf());
                                 terminate(EnumEnding.FILE_NOT_EXISTS);
-                            }       
-                            if (handshake.getModifier() == EnumFileModifier.READ){
-                                // --- In READ mode, we will not receive any answer from server NOT TRUE --- //
-                                //SimpleAnswer goAhead = new SimpleAnswer(true);
-                                //getSelf().tell(goAhead, getSelf());
+                                log.error("I wasn't able to open the file {} I had to send", handshake.getFileName());
                             }
-                            break;
+                            break;    
                     } 
+                // --- I've received a message from the tcpReceiver who tells me
+                // --- if he has enought space for storing the file I have to send.
                 } else if (msg instanceof SimpleAnswer){
                     SimpleAnswer answer = (SimpleAnswer)msg;
                     if (answer.getAnswer() == true){
@@ -227,24 +276,34 @@ public class FileTransferActor extends UntypedActor {
                                 0, size, ack_or_notAck), getSelf());
                         connectionHandler.tell(TcpMessage.close(), getSelf());      
                     } else {
-                        // --- the receiver doesn't have enought free space to store the file --- //
-                        terminate(EnumEnding.FILE_SENDING_FAILED);
-                                             
+                        terminate(EnumEnding.FILE_SENDING_FAILED);  
+                        log.info("The remote server has denied the permission to send him file []", handshake.getFileName());
                     }
                 } else if (msg instanceof Terminated){
+                    // --- Thanks to the watch(), I am been informed the interlocutor went down.
                     terminate(EnumEnding.FILE_SENDING_FAILED);
+                    log.info("The remote peer is falled, so I was unable to send him file {}. I will perform a roll back.", handshake.getFileName());                     
                 } else if(msg instanceof CommandFailed) {
-                    // OS kernel socket buffer was full
-                    // Here we should probably bring down the whole Tcp connection
+                    // --- We enter this branch if the OS kernel socket buffer was full
+                    // --- TODO: Here we should probably bring down the whole Tcp connection
+                    log.error("Error: the OS kernel socket buffer was full");
                 } else if (msg instanceof ConnectionClosed){
                     ConnectionClosed connection = (ConnectionClosed)msg;
                     if(connection.isErrorClosed()){
+                        // --- This branch handle the case there was an error during the TcpConnection
                         terminate(EnumEnding.FILE_SENDING_FAILED);
+                        log.info("There was an error during the TcpConnection, so sending of file {} has failed", handshake.getFileName());
                     } else {
+                    // --- I enter in this branch if the file was successfully transferred.
+                    // --- I communicate the outcome to the server, who is in charge of
+                    // --- deleting the file from my hard disk and from the file table and
+                    // --- deallocate the space who was occupied by him.
                         result = new FileTransferResult(
                             EnumEnding.FILE_SENT_SUCCESSFULLY, handshake.getFileName(), handshake.getModifier());
                         myServer.tell(result, getSelf());
                         getSelf().tell(PoisonPill.getInstance(), getSelf());
+                        log.info("The file {} was successfully sent in {} mode to the remote peer", 
+                                handshake.getFileName(), handshake.getModifier().toString());
                     }
                 }
             }
@@ -258,9 +317,9 @@ public class FileTransferActor extends UntypedActor {
         return new Procedure<Object>() {
             private FileTransferResult result;
             
+            // --- I ask the server to deallocate the fileEntry.
+            // --- Furthermore, I must delete the corrupted file and deallocate the corresponding space
             public void rollBack(){
-                // --- We ask the server to deallocate fileEntry and corresponding space --- //
-                // --- Furthermore, we must delete the corrupted file --- //
                 result = new FileTransferResult(
                         EnumEnding.FILE_RECEIVING_FAILED, handshake.getFileName());  
                 myServer.tell(result, getSelf());
@@ -272,8 +331,10 @@ public class FileTransferActor extends UntypedActor {
                 /**********************************
                  *  I enter here if 
                  *  1) we are receiving the file, and there is an IO error
+                 *  La stringa qui sotto non penso abbia molto senso, dal momento che
+                 *  il sender non gestisce messaggi di tipo FileTransferResult
                  **********************************/
-                interlocutor.tell(result, getSelf()); //toCheck
+                //interlocutor.tell(result, getSelf()); //toCheck
                 rollBack();
                 getSelf().tell(PoisonPill.getInstance(), getSelf());
             }
@@ -285,23 +346,25 @@ public class FileTransferActor extends UntypedActor {
                     switch(reply.getResponse()){
                         case FILE_NOT_EXISTS:
                             terminate(EnumEnding.FILE_NOT_EXISTS);
+                            log.error("The file {} I should receive doesn't exists. This is an error", handshake.getFileName());
                             break;
                         case FILE_BUSY:
                             terminate(EnumEnding.FILE_BUSY);
+                            log.info("The file {} I should receive is busy", handshake.getFileName());
                             break;
                         case AUTHORIZATION_GRANTED:
-                            // --- if the request is a READ, the server is not required to store         --- //
-                            // --- the file in the fileTable, so there is no need to ask him permission. --- //
-                            // --- Of course, we must create outself a reply for the interlocutor        --- //
+                            // --- if the request is a READ, the server is not required to store
+                            // --- the file in the fileTable, so there is no need to ask him permission.
+                            // --- Of course, we must create outself a reply for the sender
                             if(handshake.getModifier() == EnumFileModifier.WRITE){
                                 size = reply.getSize();
                                 AllocationRequest request = new AllocationRequest(
                                         handshake.getFileName(), size, reply.getTags());
                                 myServer.tell(request, getSelf()); 
                                 if (size == 0){
-                                    // --- special case: create the file and end the protocol --- //
-                                    // --- in the close() handling the guiActor               --- //
-                                    // --- will be informed of the success                    --- //
+                                    // --- special case: create the file and end the protocol
+                                    // --- in the close() handling the guiActor
+                                    // --- will be informed of the success
                                     File newFile = new File(filePath + handshake.getFileName() + "Out");
                                     if (!newFile.exists()){
                                         newFile.createNewFile();
@@ -313,10 +376,10 @@ public class FileTransferActor extends UntypedActor {
                                     connectionHandler.tell(TcpMessage.close(), getSender()); //magari dovremmo gesrtire il fatto che, se la dimensione era 0, non aggiorniamo lo spazio nella fileTable
                                 }
                             } else {  
-                                // --- READ request: we will give the permission without asking the server --- //
+                                // --- READ request: I will give the permission without asking the server --- //
                                 if (size != 0){
-                                    // --- we have to create the output stream since from here --- //
-                                    // --- we will jump directly in the receiving stage        --- //
+                                    // --- we have to create the output stream since from here
+                                    // --- we will jump directly in the receiving stage
                                     output = new FileOutputStream(tmpFilePath + handshake.getFileName()); //TODO: non dovrebbe sollevare eccezioni, vedi documentazione  
                                     SimpleAnswer answer = new SimpleAnswer(true);
                                     interlocutor.tell(answer, getSelf());
@@ -335,11 +398,14 @@ public class FileTransferActor extends UntypedActor {
                             }
                             break;
                     }
-                } else if (msg instanceof SimpleAnswer){                 
+                } else if (msg instanceof SimpleAnswer){
+                    // --- This is the reply from my server, telling me if there is enough space
+                    // --- for storing the file the tcpSendere wants to send me
                     SimpleAnswer answer = (SimpleAnswer)msg;
                     interlocutor.tell(answer, getSelf());
                     if(answer.getAnswer() == false){
                         terminate(EnumEnding.NOT_ENOUGH_SPACE);
+                        log.info("There is not enough space for receiving file {}", handshake.getFileName());
                     } else {
                         output = new FileOutputStream(filePath + handshake.getFileName() + "Out"); //TODO: non dovrebbe sollevare eccezioni, vedi documentazione  
                     }
@@ -349,22 +415,28 @@ public class FileTransferActor extends UntypedActor {
                             output.write(buffer.array());
                         } catch (Exception e){
                             terminate(EnumEnding.FILE_RECEIVING_FAILED);
+                            log.error("Error in receiving file {}: there is not enough space on my hard disk", handshake.getFileName());
                         }
                 } else if (msg instanceof Terminated){
                     terminate(EnumEnding.FILE_RECEIVING_FAILED);
+                    log.error("The remote peer is falled, so I was unable to receive file {}. I will perform a roll back.", handshake.getFileName());                     
                 } else if(msg instanceof CommandFailed) {
-                // OS kernel socket buffer was full
-                // Here we should probably bring down the whole Tcp connection
+                    // --- OS kernel socket buffer was full
+                    // --- TODO: Here we should probably bring down the whole Tcp connection
+                    log.error("the OS kernel socket buffer was full");
                 } else if(msg instanceof ConnectionClosed) {
                     ConnectionClosed connection = (ConnectionClosed)msg;
                     if(connection.isErrorClosed()){
                         terminate(EnumEnding.FILE_RECEIVING_FAILED);
+                        log.info("There was an error during the TcpConnection, so receiving of file {} has failed", handshake.getFileName());
                     } else {
                         //all went the right direction: communicate to the clusterListener...
                         output.close(); //TODO: Throws IOException if an I/O error occurs. In case of exception, rollBack etc.
                         FileTransferResult result = new FileTransferResult(
                                 EnumEnding.FILE_RECEIVED_SUCCESSFULLY, handshake.getFileName(), handshake.getModifier());
                         myGuiActor.tell(result, getSelf());
+                        log.info("The file {} was successfully received in {} mode from the remote peer",
+                                handshake.getFileName(), handshake.getModifier().toString());
                     }
                 }
             }

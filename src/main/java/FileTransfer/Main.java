@@ -1,6 +1,8 @@
 package FileTransfer;
 
+import FileTransfer.messages.EnumBehavior;
 import FileTransfer.messages.EnumFileModifier;
+import FileTransfer.messages.Handshake;
 import akka.actor.ActorSystem;
 import akka.actor.Props;
 import com.typesafe.config.Config;
@@ -48,24 +50,22 @@ public class Main {
                 "clusterListener"+port);
             
             if(port.equals("7777")||port.equals("7779")){  
+                System.out.println("La mia porta è 7777\n");
                 System.out.printf("Il mio ip est %s\n",InetAddress.getLocalHost().toString());
-                InetAddress address = InetAddress.getByName(serverIp);
-                InetSocketAddress remote = new InetSocketAddress(address,5678);
-                
-                final ActorRef tcpClient = system.actorOf(Props.create(Client.class, 
-                        remote, clusterListener, "inputFile.txt", TcpBehavior.REQUEST_FILE, EnumFileModifier.WRITE),
-                        "tcpClient"+port);
                 
                 //fileTransferSender is the name through which the Server lookup the sender
-                final ActorRef client = system.actorOf(Props.create(FileTransferActor.class,7777,),"fileTransferSender");
-
+                final ActorRef server = system.actorOf(Props.create(Server.class,7777,2220),"server");
+                
+                Handshake h = new Handshake(EnumBehavior.REQUEST,"inputFile.txt",EnumFileModifier.WRITE);
+                InetAddress ia = InetAddress.getLocalHost();
+                final ActorRef client = system.actorOf(Props.create(FileTransferActor.class,7777,ia,2221,h),"fileTransferSender");
             }
             else if(port.equals("2551")){
                 System.out.println("La mia porta è 2551\n");
                 System.out.printf("Il mio ip est %s\n",InetAddress.getLocalHost().toString());
-                //System.out.println("La mia porta è la 2551");    
-                final ActorRef tcpServer = system.actorOf(Props.create(Server.class, clusterListener),
-                        "tcpServer"+port);
+                
+                //final ActorRef client = system.actorOf(Props.create(FileTransferActor.class,2551,2220),"fileTransferSender");
+                final ActorRef server = system.actorOf(Props.create(Server.class,2551,2221),"server");
             }
     }
 }

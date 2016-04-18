@@ -17,6 +17,10 @@ public class Handshake implements Serializable {
     private EnumBehavior behavior;
     private String fileName;
     private EnumFileModifier modifier;
+
+    public Handshake(EnumBehavior behavior) {
+        this.behavior = behavior;
+    }
     
     public Handshake(EnumBehavior behavior, String fileName){
         this.behavior = behavior;

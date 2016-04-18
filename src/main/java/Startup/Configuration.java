@@ -10,6 +10,7 @@ package Startup;
  * @author Alessandro
  */
 public class Configuration {
+    static final int tcpPort = 3333;
     static final long maxByteSpace = 1000000000;
     static final String filePath = "files/";
     static final String tmpFilePath = System.getProperty("java.io.tmpdir");
@@ -24,5 +25,9 @@ public class Configuration {
 
     static public String getTmpFilePath() {
         return tmpFilePath;
+    }
+
+    public static int getTcpPort() {
+        return tcpPort;
     }
 }
