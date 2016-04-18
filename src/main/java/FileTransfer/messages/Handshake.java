@@ -43,6 +43,5 @@ public class Handshake implements Serializable {
     
     public void setBehavior(EnumBehavior behavior){
         this.behavior = behavior;
-    }
-            
+    }    
 }

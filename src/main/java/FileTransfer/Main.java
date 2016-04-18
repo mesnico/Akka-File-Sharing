@@ -56,6 +56,8 @@ public class Main {
                         remote, clusterListener, "inputFile.txt", TcpBehavior.REQUEST_FILE, EnumFileModifier.WRITE),
                         "tcpClient"+port);
                 
+                //fileTransferSender is the name through which the Server lookup the sender
+                final ActorRef client = system.actorOf(Props.create(FileTransferActor.class,7777,),"fileTransferSender");
 
             }
             else if(port.equals("2551")){

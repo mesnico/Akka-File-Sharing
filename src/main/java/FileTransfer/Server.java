@@ -1,5 +1,5 @@
 // ------------ THINGS TO MODIFY ------------ //
-// Server port and BACKLOG_SIZE
+// 
 // 
 // See comments below
 //
@@ -15,7 +15,9 @@ import FileTransfer.messages.AuthorizationReply;
 import FileTransfer.messages.FileTransferResult;
 import FileTransfer.messages.Handshake;
 import FileTransfer.messages.SendFreeSpaceSpread;
+import FileTransfer.messages.SimpleAnswer;
 import Startup.AddressResolver;
+import Startup.Configuration;
 import java.net.InetSocketAddress;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
@@ -39,13 +41,15 @@ public class Server extends UntypedActor {
     final FileTable fileTable;
     int clusterSystemPort;
     int tcpPort;
+    final String filePath = Configuration.getFilePath();
+    final String tmpFilePath = Configuration.getTmpFilePath();
     
     public Server(int basePort) {
         clusterSystemPort = basePort;
         tcpPort = basePort + 1;
         // TODO: the server, at boot time, has to read from the fileTable stored on disk
         // which file it has, insert them in his fileTable, and calculate his freeSpace.
-        myFreeSpace = 1000000000;
+        myFreeSpace = Configuration.getMaxByteSpace();
         fileTable = new FileTable();
     }
 
@@ -90,16 +94,18 @@ public class Server extends UntypedActor {
         // --------------------------------- //
         // --- AUTHORIZATION REQUEST --- //
         else if (msg instanceof AllocationRequest){
-            /*  STILL TO DO
-            Handshake receivedRequest = (Handshake)msg;
-            
-            System.out.printf("I've received a %s request on file %s\n",
-                    receivedRequest.getModifier(),receivedRequest.getFileName());
-            
-            AuthorizationReply rensponseToSend = fileTable.testAndSet(
-                    receivedRequest.getFileName(), receivedRequest.getModifier());
-            getSender().tell(rensponseToSend, getSelf());  
-           */
+            AllocationRequest request = (AllocationRequest)msg;
+            if (myFreeSpace >= request.getSize()){
+                myFreeSpace -= request.getSize();
+                FileElement newElement = new FileElement(false, request.getSize(),
+                        request.getTags());
+                if(fileTable.createOrUpdateEntry(request.getFileName(), newElement)==false){
+                    log.error("Someone tried to send me the file {} I already own", request.getFileName());
+                }                
+                getSender().tell(new SimpleAnswer(true), getSelf());
+            } else {
+                getSender().tell(new SimpleAnswer(false), getSelf());
+            }
         } 
         
         // --- FILE TRANSFER RESULT --- //
@@ -109,11 +115,20 @@ public class Server extends UntypedActor {
         
             switch(transferResult.getMessageType()){
                 case FILE_RECEIVING_FAILED:
-                    //qui bisogna cancellare il file col nome dato
-                    //e deallocare uno spazio pari alla sua dimensione
-                    
-                    //FileElement newElement = new FileElement(false, new File(fileName).length());
-                    //fileTable.createOrUpdateEntry(fileName, newElement);
+                    // --- In this case we have to delete the entry for the file, free the --- //
+                    // --- corresponding space and delete the received part of the file --- //
+                    if (transferResult.getFileModifier() == EnumFileModifier.WRITE){
+                        FileElement e = fileTable.deleteEntry(fileName);
+                        if (e == null){
+                            log.info("The rollBack has no effect on {}", fileName);
+                        } else {
+                            myFreeSpace += e.getSize();
+                        }
+                        File corruptedFile = new File(filePath + fileName);
+                        if(corruptedFile.exists() && corruptedFile.canWrite()){
+                            corruptedFile.delete();
+                        }                        
+                    }
                     break;
                 case FILE_SENT_SUCCESSFULLY:
                     if (transferResult.getFileModifier() == EnumFileModifier.WRITE){
@@ -121,9 +136,13 @@ public class Server extends UntypedActor {
                         if(e == null){
                             log.error("File entry for file {} does't exist", fileName);
                         } else {
-                            myFreeSpace -= e.getSize();
+                            myFreeSpace += e.getSize();
                             SendFreeSpaceSpread spaceToPublish = new SendFreeSpaceSpread(myFreeSpace);
                             myClusterListener.tell(spaceToPublish, getSelf());
+                            File sentFile = new File(filePath + fileName);
+                            if(sentFile.exists() && sentFile.canWrite()){
+                                sentFile.delete();
+                            }
                         }
                     }
                     break;
