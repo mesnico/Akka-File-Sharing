@@ -10,8 +10,11 @@
 package FileTransfer;
 
 import FileTransfer.messages.AllocationRequest;
+import FileTransfer.messages.AuthorizationReply;
 import FileTransfer.messages.EnumFileModifier;
 import FileTransfer.messages.FileTransferResult;
+import FileTransfer.messages.Handshake;
+import FileTransfer.messages.Hello;
 import FileTransfer.messages.SendFreeSpaceSpread;
 import FileTransfer.messages.SimpleAnswer;
 import Startup.AddressResolver;
@@ -31,6 +34,7 @@ import akka.io.TcpMessage;
 import java.io.File;
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 
 public class Server extends UntypedActor {
@@ -42,6 +46,7 @@ public class Server extends UntypedActor {
     int tcpPort;
     final String filePath = Configuration.getFilePath();
     final String tmpFilePath = Configuration.getTmpFilePath();
+    HashMap<String, Integer> addressTable;
     
     public Server(int clusterSystemPort, int tcpPort) {
         this.clusterSystemPort = clusterSystemPort;
@@ -50,6 +55,7 @@ public class Server extends UntypedActor {
         // which file it has, insert them in his fileTable, and calculate his freeSpace.
         myFreeSpace = Configuration.getMaxByteSpace();
         fileTable = new FileTable();
+        addressTable = new HashMap<>();
     }
 
     @Override
@@ -70,25 +76,31 @@ public class Server extends UntypedActor {
         System.out.printf("[server]: createOrUpdateEntry restituisce %b\n", ret);
     }
      
-    // -------------------------------- //
-    // ---- BOUND MESSAGE HANDLING ---- //
-    // -------------------------------- //
+    // -------------------------------------------------------- //
+    // ---- BOUND RESULT AND CONNECTION TENTATIVE HANDLING ---- //
+    // -------------------------------------------------------- //
     @Override
     public void onReceive(Object msg) throws Exception {
         if (msg instanceof Bound) {
             myClusterListener.tell(msg, getSelf()); //Are we interested in this? (Bind was successful)
+        } else if (msg instanceof Hello) {
+            Hello hello = (Hello) msg;
+            addressTable.put(hello.getIpAddress(), hello.getPort());
+            Hello newHello = new Hello(AddressResolver.getMyIpAddress(), tcpPort);
+            getSender().tell(newHello, getSelf());
         } else if (msg instanceof CommandFailed) {
             getContext().stop(getSelf()); //in this case we may bring down the application (bind failed)
         } else if (msg instanceof Connected) {
-            
             Connected conn = (Connected) msg;
-            // From akka documentation it wasn't clear if we should use remoteAddress or localAddress
             InetSocketAddress remoteAddress = conn.remoteAddress();
-            myClusterListener.tell(conn, getSelf()); //Are we interested in this? (a client connected to us)
+            //myClusterListener.tell(conn, getSelf()); //Are we interested in this? (a client connected to us)
+            
+            
             final ActorRef handler = getContext().actorOf(
                 Props.create(FileTransferActor.class, clusterSystemPort, 
-                    /*remoteAddress.getAddress().getHostAddress(),*/ getSender()));
+                    remoteAddress.getAddress(), getSender()));
             getSender().tell(TcpMessage.register(handler), getSelf());
+            log.debug("I, the server, have received a connection request and I've accepted it");
         }
         
         // --------------------------------- //
@@ -109,16 +121,24 @@ public class Server extends UntypedActor {
                 getSender().tell(new SimpleAnswer(false), getSelf());
             }
         } 
+        else if (msg instanceof Handshake){
+            Handshake handshake = (Handshake)msg;
+            // --- A FileTransferActor wants to send a file. I have to verify if it exists, is busy,
+            // --- or if it's available. In the last case I have to mark it as  busy and
+            // --- send back, togheder with the reply, the file's size and tags.
+            AuthorizationReply reply = fileTable.testAndSet(handshake.getFileName(), handshake.getModifier());
+            getSender().tell(reply, getSelf());
+        }
         
         // --- FILE TRANSFER RESULT --- //
         else if (msg instanceof FileTransferResult){
             FileTransferResult transferResult = ((FileTransferResult) msg);
             String fileName = transferResult.getFileName();
         
-            switch(transferResult.getMessageType()){
+            switch(transferResult.getMessageType()){             
                 case FILE_RECEIVING_FAILED:
-                    // --- In this case we have to delete the entry for the file, free the --- //
-                    // --- corresponding space and delete the received part of the file --- //
+                    // --- In this case we have to delete the entry for the file, free the
+                    // --- corresponding space and delete the received part of the file  
                     if (transferResult.getFileModifier() == EnumFileModifier.WRITE){
                         FileElement e = fileTable.deleteEntry(fileName);
                         if (e == null){

@@ -34,7 +34,7 @@ class FileElement{
     }
 
     public void setOccupied(boolean occupied) {
-        this.occupied = occupied;
+            this.occupied = occupied;
     }
 
     public long getSize() {
@@ -62,7 +62,7 @@ public class FileTable {
         return false;
     }
     
-    //returns false if the fileName doesn't exists.
+    // --- Returns false if the fileName doesn't exists.
     public FileElement deleteEntry(String fileName){
         FileElement e = fileTable.remove(fileName);
         return e;
@@ -75,20 +75,21 @@ public class FileTable {
         return true;
     }
     
-    //check if a file exists in the table
+    // --- Check if a file exists in the table or if it's busy.
+    // --- If it's free, I set it as busy and return also the file's size and tags
     public AuthorizationReply testAndSet(String fileName, EnumFileModifier readOrWrite){
         if(!fileTable.containsKey(fileName)){
-            System.out.println("[fileTable]: sono nella testAndSet, sto per restituire FILE_NOT_EXISTS");
             return new AuthorizationReply(EnumAuthorizationReply.FILE_NOT_EXISTS);
         } else if(fileTable.get(fileName).isOccupied()) {
-            System.out.println("[fileTable]: sono nella testAndSet, sto per restituire FILE_BUSY");
             return new AuthorizationReply(EnumAuthorizationReply.FILE_BUSY);
         } else {
             if(readOrWrite == EnumFileModifier.WRITE){
                 System.out.println("[fileTable]: sono nella testAndSet, sto per marcare il file come occupato");
                 fileTable.get(fileName).setOccupied(true);
             }
-            return new AuthorizationReply(EnumAuthorizationReply.AUTHORIZATION_GRANTED);
+            return new AuthorizationReply(EnumAuthorizationReply.AUTHORIZATION_GRANTED, 
+                    fileTable.get(fileName).getSize(), 
+                    fileTable.get(fileName).getTags());
         }
     }
     

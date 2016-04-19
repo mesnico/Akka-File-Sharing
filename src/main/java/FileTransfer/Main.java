@@ -3,6 +3,7 @@ package FileTransfer;
 import FileTransfer.messages.EnumBehavior;
 import FileTransfer.messages.EnumFileModifier;
 import FileTransfer.messages.Handshake;
+import Startup.AddressResolver;
 import akka.actor.ActorSystem;
 import akka.actor.Props;
 import com.typesafe.config.Config;

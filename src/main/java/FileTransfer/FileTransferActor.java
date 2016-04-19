@@ -25,6 +25,7 @@ import FileTransfer.messages.FileTransferResult;
 import FileTransfer.messages.Handshake;
 import FileTransfer.messages.EnumEnding;
 import FileTransfer.messages.EnumFileModifier;
+import FileTransfer.messages.Hello;
 import FileTransfer.messages.SimpleAnswer;
 import Startup.AddressResolver;
 import Startup.Configuration;
@@ -60,14 +61,16 @@ public class FileTransferActor extends UntypedActor {
     ActorRef interlocutor;
     ActorRef connectionHandler;
     Handshake handshake;
-    int clusterSystemPort;
+    int localClusterSystemPort;
+    int remoteClusterSystemPort;
     // --- tcpPort is used only when this FileTrransferActor is working as client
     int tcpPort;
-    InetAddress remoteServerIp;  
+    InetAddress interlocutorIp;  
     long size;
     FileOutputStream output;
     final String filePath = Configuration.getFilePath();
     final String tmpFilePath = Configuration.getTmpFilePath();
+    
     
     // ---------------------- //
     // ---- CONSTRUCTORS ---- //
@@ -76,30 +79,33 @@ public class FileTransferActor extends UntypedActor {
     // --- if something goes wrong when the receiver has not asked yet to the server,
     // --- the permission to receive the file, the rollBack procedure isn't dangerous 
     // --- (e.g. it could try to free some space although no space was allocated
-    public FileTransferActor(int clusterListenerPort) {
-        this.clusterSystemPort = clusterListenerPort;
+    public FileTransferActor(int clusterListenerPort, int remoteClusterSystemPort) {
+        this.remoteClusterSystemPort = remoteClusterSystemPort;
+        this.localClusterSystemPort = clusterListenerPort;
         size = 0;
     }
     
     // --- Constructor called by the asker. The handshake variabile specify what the
     // --- asker has to do (e.g. send a file or request a file). The remoteServerIp is the IP address
     // --- of the server to which che asker will try to connect.
-    public FileTransferActor(int clusterListenerPort, InetAddress remoteServerIp, int tcpPort, Handshake handshake) {
-        this(clusterListenerPort);
+    public FileTransferActor(int clusterListenerPort, InetAddress remoteServerIp, int remoteClusterSystemPort,
+            int tcpPort, Handshake handshake) {
+        this(clusterListenerPort, remoteClusterSystemPort);
         this.tcpPort = tcpPort;
         this.handshake = handshake;
-        this.remoteServerIp = remoteServerIp;
+        this.interlocutorIp = remoteServerIp;
+        log.debug("Interlocutor IP is {}", remoteServerIp.getHostAddress());
     }
     
     // --- Constructor called by the responder. The handshake variabile is also used to distinguish
     // --- which part of the code the FileTransferActor has to execute (see preStart)
-    public FileTransferActor(int clusterListenerPort, /*InetAddress remoteServerIp,*/ ActorRef connectionHandler ) {
-        this(clusterListenerPort);
-        // ERR: remoteServerIp è un InetAddress, mentre nel server gli passiamo una stringa.
-        // L'unico punto dove pare essere necessario è quanto ricaviamo l'interlocutorSelection
+    public FileTransferActor(int localClusterSystemPort, InetAddress askerIp, int remoteClusterSystemPort, 
+            ActorRef connectionHandler ) {
+        this(localClusterSystemPort, remoteClusterSystemPort);
         handshake = new Handshake(EnumBehavior.UNINITIALIZED);
-        //this.remoteServerIp = remoteServerIp;
+        this.interlocutorIp = askerIp;
         this.connectionHandler = connectionHandler;
+        log.debug("Interlocutor IP is {}", askerIp.getHostAddress());
     }    
     
     // ----------------------------- //
@@ -124,33 +130,38 @@ public class FileTransferActor extends UntypedActor {
     @Override
     public void preStart() throws Exception {
         myServer = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"
-                +clusterSystemPort+"/user/server");
+                +localClusterSystemPort+"/user/server");
         // TODO: check if this reference is needed by both behavior
         myClusterListener = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"
-                +clusterSystemPort+"/user/clusterListener");
+                +localClusterSystemPort+"/user/clusterListener");
         myGuiActor = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"
-                +clusterSystemPort+"/user/gui");   
+                +localClusterSystemPort+"/user/gui");  
+        log.debug("My server's name is {} ", myServer);
         
         switch(handshake.getBehavior()){
             case SEND:
             case REQUEST:
                 // --- I am the asker, so I have to connect to the remoteServer.
                 // --- The tcpManager does this for me.
-                remoteServer = getContext().actorSelection("akka.tcp://ClusterSystem@"+remoteServerIp.getHostAddress()+":"
-                +clusterSystemPort+"/user/server");
+                remoteServer = getContext().actorSelection("akka.tcp://ClusterSystem@"+interlocutorIp.getHostAddress()+":"
+                +remoteClusterSystemPort+"/user/server");
                 final ActorRef tcpManager = Tcp.get(getContext().system()).manager();
-                InetSocketAddress remoteServerAddress = new InetSocketAddress(remoteServerIp, tcpPort);
+                InetSocketAddress remoteServerAddress = new InetSocketAddress(interlocutorIp, tcpPort);
                 tcpManager.tell(TcpMessage.connect(remoteServerAddress), getSelf());
+                log.debug("Remote server's name is {}", remoteServer);
                 break;
             case UNINITIALIZED:
                 // --- I am the responder, I was spawned by my server for handling an
                 // --- incoming connection. I'll ack the asker peer just to let him know my address
-                ActorSelection interlocutorSelection = getContext().actorSelection("akka.tcp://ClusterSystem@"+remoteServerIp.getHostAddress()+":"
-                        +clusterSystemPort+"/user/fileTransferSender"); 
+                System.out.println("client");
+                ActorSelection interlocutorSelection = getContext().actorSelection("akka.tcp://ClusterSystem@"+interlocutorIp.getHostAddress()+":"
+                        +7777+"/user/fileTransferSender");
                 FiniteDuration timeout = new FiniteDuration(10, SECONDS);
+                
                 interlocutor = Await.result(interlocutorSelection.resolveOne(timeout), timeout); //Check
                 interlocutor.tell("ack", getSelf());
-                log.debug("interlocutor actorRef is {}", interlocutor);
+                //interlocutor.tell("Prova", getSelf());
+                log.debug("Interlocutor actorRef is {}", interlocutor);
                 break;     
         }
     }
@@ -178,12 +189,18 @@ public class FileTransferActor extends UntypedActor {
             interlocutor.tell(handshake, getSelf());
             getContext().watch(interlocutor);
             changeBehavior();
+            log.debug("I have received the Ack, so now I can contact the remote peer");
         } else if (msg instanceof Handshake){
             // --- I am the responder. I've received the handshake variabile who tell me how
             // --- I must set my behavior. The behavior changing is performed in the changeBehavior()
             this.handshake = (Handshake)msg;
             getContext().watch(interlocutor);
             changeBehavior();
+            log.debug("I have received the handshake message, so now I know how to behave");
+        } else if (msg instanceof Hello){
+        
+        } else if (msg instanceof String){
+            System.out.printf("I received %s\n", (String)msg);
         }
     }
     
@@ -223,34 +240,35 @@ public class FileTransferActor extends UntypedActor {
             
             @Override
             public void apply(Object msg) throws Exception {
-                // --- I receive the "go" message from myself, telling me to start the protocol
                 if(msg instanceof String){
+                    System.out.println("::: Received: "+(String)msg);
+                    // --- I receive the "go" message from myself, telling me to start the protocol
                     myServer.tell(handshake, getSelf());    
-                // --- I receive the answer from myServer, who says if the file I have to send
-                // --- is busy, is available, or if it doesn't exists (this is an error)
                 } else if (msg instanceof AuthorizationReply){
+                    // --- I receive this nswer from myServer, who says if the file I have to send
+                    // --- is busy, available, or if it doesn't exists (this is an error)
                     AuthorizationReply reply = (AuthorizationReply)msg;
                     switch(reply.getResponse()){
-                        // --- The file I had to send doesn't exists. I forward the information
-                        // --- to the receiver, and terminate the protocol.
                         case FILE_NOT_EXISTS:
+                            // --- The file I had to send doesn't exists. I forward the information
+                            // --- to the receiver, and terminate the protocol.
                             interlocutor.tell(reply, getSelf());
                             terminate(EnumEnding.FILE_NOT_EXISTS);
                             log.error("The file {} I had to send doesn'n exists", handshake.getFileName());
                             break;
-                        // --- In the following case I must not perform the rollBack, because
-                        // --- it frees the file I was trying to send, but in this case
-                        // --- that file is keept busy by someone different from me, so I must not free it.
-                        // --- There is no need to inform the guiActor: if a exitLoadBalancing
-                        // --- is happening, sending a FILE_SENDING_FAILED would cause the
-                        // --- guiActor to decrease the count of files to send, and we don't want this.
                         case FILE_BUSY:
+                            // --- In this case I must not perform the rollBack, because
+                            // --- it frees the file I was trying to send, but in this case
+                            // --- that file is keept busy by someone different from me, so I must not free it.
+                            // --- There is no need to inform the guiActor: if a exitLoadBalancing
+                            // --- is happening, sending a FILE_SENDING_FAILED would cause the
+                            // --- guiActor to decrease the count of files to send, and we don't want this.                            
                             interlocutor.tell(reply, getSelf());
                             getSelf().tell(PoisonPill.getInstance(), getSelf());
                             log.info("The file {} I had to send is busy", handshake.getFileName());
                             break;
-                        // --- The file exists and I'm allowed to send it. I have to perform some checks
                         case AUTHORIZATION_GRANTED:
+                            // --- The file exists and I'm allowed to send it. I have to perform some checks
                             File fileToSend = new File(filePath + handshake.getFileName());
                             size = reply.getSize();
                             if (fileToSend.exists()&&fileToSend.canRead()){
@@ -279,6 +297,10 @@ public class FileTransferActor extends UntypedActor {
                         terminate(EnumEnding.FILE_SENDING_FAILED);  
                         log.info("The remote server has denied the permission to send him file []", handshake.getFileName());
                     }
+                } else if (msg instanceof FileTransferResult){
+                    FileTransferResult result = (FileTransferResult)msg;
+                    terminate(result.getMessageType());
+                    log.info("The receiver side says: {}", result.getMessageType());
                 } else if (msg instanceof Terminated){
                     // --- Thanks to the watch(), I am been informed the interlocutor went down.
                     terminate(EnumEnding.FILE_SENDING_FAILED);
@@ -316,7 +338,6 @@ public class FileTransferActor extends UntypedActor {
     private Procedure<Object> tcpReceiver() {
         return new Procedure<Object>() {
             private FileTransferResult result;
-            
             // --- I ask the server to deallocate the fileEntry.
             // --- Furthermore, I must delete the corrupted file and deallocate the corresponding space
             public void rollBack(){
@@ -372,6 +393,12 @@ public class FileTransferActor extends UntypedActor {
                                     } else {
                                         log.error("This should not happen: File {} already exists", handshake.getFileName());
                                         //si cancella e si ricrea
+                                        /*
+                                                                File corruptedFile = new File(filePath + fileName);
+                        if(corruptedFile.exists() && corruptedFile.canWrite()){
+                            corruptedFile.delete();
+                        }     
+                                        */
                                     }
                                     connectionHandler.tell(TcpMessage.close(), getSender()); //magari dovremmo gesrtire il fatto che, se la dimensione era 0, non aggiorniamo lo spazio nella fileTable
                                 }
@@ -414,7 +441,9 @@ public class FileTransferActor extends UntypedActor {
                         try{
                             output.write(buffer.array());
                         } catch (Exception e){
-                            terminate(EnumEnding.FILE_RECEIVING_FAILED);
+                            result = new FileTransferResult(EnumEnding.NOT_ENOUGH_SPACE);
+                            interlocutor.tell(result, getSelf());
+                            terminate(EnumEnding.IO_ERROR);
                             log.error("Error in receiving file {}: there is not enough space on my hard disk", handshake.getFileName());
                         }
                 } else if (msg instanceof Terminated){
