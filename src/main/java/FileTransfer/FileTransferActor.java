@@ -89,7 +89,7 @@ public class FileTransferActor extends UntypedActor {
     // --- asker has to do (e.g. send a file or request a file). The remoteServerIp is the IP address
     // --- of the server to which che asker will try to connect.
     public FileTransferActor(int clusterListenerPort, InetAddress remoteServerIp, int remoteClusterSystemPort,
-            int tcpPort, Handshake handshake) {
+            Handshake handshake) {
         this(clusterListenerPort, remoteClusterSystemPort);
         this.tcpPort = tcpPort;
         this.handshake = handshake;
@@ -115,6 +115,7 @@ public class FileTransferActor extends UntypedActor {
     // --- handshake.behavior variabile has been initialized, to change their own
     // --- behavior to tcpSender or tcpReceiver.    
     public void changeBehavior(){
+        log.debug("My behavior is {}", handshake.getBehavior());
         if(handshake.getBehavior() == EnumBehavior.SEND){
             // --- I change my behavior to tcpSender and I tell myself to start the protocol --- //
             getContext().become(tcpSender());  
@@ -144,23 +145,20 @@ public class FileTransferActor extends UntypedActor {
                 // --- I am the asker, so I have to connect to the remoteServer.
                 // --- The tcpManager does this for me.
                 remoteServer = getContext().actorSelection("akka.tcp://ClusterSystem@"+interlocutorIp.getHostAddress()+":"
-                +remoteClusterSystemPort+"/user/server");
-                final ActorRef tcpManager = Tcp.get(getContext().system()).manager();
-                InetSocketAddress remoteServerAddress = new InetSocketAddress(interlocutorIp, tcpPort);
-                tcpManager.tell(TcpMessage.connect(remoteServerAddress), getSelf());
+                    +remoteClusterSystemPort+"/user/server");
+                Hello hello = new Hello(AddressResolver.getMyIpAddress(),localClusterSystemPort);
+                remoteServer.tell(hello, getSelf());
                 log.debug("Remote server's name is {}", remoteServer);
                 break;
             case UNINITIALIZED:
                 // --- I am the responder, I was spawned by my server for handling an
                 // --- incoming connection. I'll ack the asker peer just to let him know my address
-                System.out.println("client");
                 ActorSelection interlocutorSelection = getContext().actorSelection("akka.tcp://ClusterSystem@"+interlocutorIp.getHostAddress()+":"
-                        +7777+"/user/fileTransferSender");
+                        +remoteClusterSystemPort+"/user/fileTransferSender");
                 FiniteDuration timeout = new FiniteDuration(10, SECONDS);
                 
-                interlocutor = Await.result(interlocutorSelection.resolveOne(timeout), timeout); //Check
-                interlocutor.tell("ack", getSelf());
-                //interlocutor.tell("Prova", getSelf());
+                interlocutor = Await.result(interlocutorSelection.resolveOne(timeout), timeout);   
+                interlocutor.tell(new Ack(), getSelf());
                 log.debug("Interlocutor actorRef is {}", interlocutor);
                 break;     
         }
@@ -168,7 +166,15 @@ public class FileTransferActor extends UntypedActor {
     
     @Override
     public void onReceive(Object msg) {
-        if (msg instanceof CommandFailed) {
+        if (msg instanceof Hello){
+            tcpPort = ((Hello) msg).getPort();
+            
+            // --- I use the received port from the server to connect to it.
+            final ActorRef tcpManager = Tcp.get(getContext().system()).manager();
+            InetSocketAddress remoteServerAddress = new InetSocketAddress(interlocutorIp, tcpPort);
+            tcpManager.tell(TcpMessage.connect(remoteServerAddress), getSelf());
+            
+        } else if (msg instanceof CommandFailed) {
             // --- I am the asker. The connectionHandler tells me the connection enstablishment failed
             FileTransferResult result = new FileTransferResult(
                     EnumEnding.FILE_SENDING_FAILED, handshake.getFileName(), handshake.getModifier()); 
@@ -192,12 +198,18 @@ public class FileTransferActor extends UntypedActor {
             log.debug("I have received the Ack, so now I can contact the remote peer");
         } else if (msg instanceof Handshake){
             // --- I am the responder. I've received the handshake variabile who tell me how
-            // --- I must set my behavior. The behavior changing is performed in the changeBehavior()
+            // --- I must set my behavior.
+            // --- Then the behavior is initially specialized at the opposite value of behavior within
+            // --- the Handshake message
             this.handshake = (Handshake)msg;
+            if(handshake.getBehavior()==EnumBehavior.SEND){
+                handshake.setBehavior(EnumBehavior.REQUEST);
+            } else {
+                handshake.setBehavior(EnumBehavior.SEND);
+            }
             getContext().watch(interlocutor);
             changeBehavior();
             log.debug("I have received the handshake message, so now I know how to behave");
-        } else if (msg instanceof Hello){
         
         } else if (msg instanceof String){
             System.out.printf("I received %s\n", (String)msg);
@@ -363,6 +375,7 @@ public class FileTransferActor extends UntypedActor {
             @Override
             public void apply(Object msg) throws Exception {
                 if (msg instanceof AuthorizationReply){
+                    log.info("Authorization reply from the Sender {} said: {}",getSender(),(AuthorizationReply)msg);
                     AuthorizationReply reply = (AuthorizationReply)msg;
                     switch(reply.getResponse()){
                         case FILE_NOT_EXISTS:

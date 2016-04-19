@@ -40,4 +40,9 @@ public class AuthorizationReply implements Serializable {
     public List<String> getTags(){
         return tags;
     }
+    
+    @Override
+    public String toString(){
+        return response +"; size= "+size+"; tags= "+tags;
+    }
 }

@@ -1,18 +1,18 @@
 package FileTransfer;
 
+import FileTransfer.messages.AllocationRequest;
 import FileTransfer.messages.EnumBehavior;
 import FileTransfer.messages.EnumFileModifier;
 import FileTransfer.messages.Handshake;
-import Startup.AddressResolver;
 import akka.actor.ActorSystem;
 import akka.actor.Props;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 
-import java.net.InetSocketAddress;
 import akka.actor.ActorRef;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 
 
 
@@ -59,14 +59,20 @@ public class Main {
                 
                 Handshake h = new Handshake(EnumBehavior.REQUEST,"inputFile.txt",EnumFileModifier.WRITE);
                 InetAddress ia = InetAddress.getLocalHost();
-                final ActorRef client = system.actorOf(Props.create(FileTransferActor.class,7777,ia,2221,h),"fileTransferSender");
+                final ActorRef client = system.actorOf(Props.create(FileTransferActor.class,7777,ia,2551,h),"fileTransferSender");
             }
             else if(port.equals("2551")){
                 System.out.println("La mia porta è 2551\n");
                 System.out.printf("Il mio ip est %s\n",InetAddress.getLocalHost().toString());
                 
-                //final ActorRef client = system.actorOf(Props.create(FileTransferActor.class,2551,2220),"fileTransferSender");
                 final ActorRef server = system.actorOf(Props.create(Server.class,2551,2221),"server");
+                
+                // --- fake the Allocation Request
+                ArrayList<String> r = new ArrayList<>();
+                r.add("ciao");
+                AllocationRequest ar = new AllocationRequest("inputFile.txt",1024,r);
+                server.tell(ar, ActorRef.noSender());
+                
             }
     }
 }

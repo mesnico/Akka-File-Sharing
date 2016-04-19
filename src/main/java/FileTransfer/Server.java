@@ -42,14 +42,15 @@ public class Server extends UntypedActor {
     long myFreeSpace;
     ActorSelection myClusterListener;
     final FileTable fileTable;
-    int clusterSystemPort;
+    int localClusterSystemPort;
+    int remoteClusterSystemPort;
     int tcpPort;
     final String filePath = Configuration.getFilePath();
     final String tmpFilePath = Configuration.getTmpFilePath();
     HashMap<String, Integer> addressTable;
     
-    public Server(int clusterSystemPort, int tcpPort) {
-        this.clusterSystemPort = clusterSystemPort;
+    public Server(int localClusterSystemPort, int tcpPort) {
+        this.localClusterSystemPort = localClusterSystemPort;
         this.tcpPort = tcpPort;
         // TODO: the server, at boot time, has to read from the fileTable stored on disk
         // which file it has, insert them in his fileTable, and calculate his freeSpace.
@@ -61,7 +62,7 @@ public class Server extends UntypedActor {
     @Override
     public void preStart() throws Exception {
         myClusterListener = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"
-                +clusterSystemPort+"/user/clusterListener");
+                +localClusterSystemPort+"/user/clusterListener");
         
         final ActorRef tcpManager = Tcp.get(getContext().system()).manager();
         tcpManager.tell(TcpMessage.bind(
@@ -69,11 +70,7 @@ public class Server extends UntypedActor {
                     new InetSocketAddress(InetAddress.getLocalHost(), tcpPort), 
                     100)
                 , getSelf());
-        ArrayList<String> r = new ArrayList<>();
-        r.add("ciao");
-        FileElement newElement = new FileElement(false, 1, r);
-        boolean ret = fileTable.createOrUpdateEntry("inputFile.txt", newElement);
-        System.out.printf("[server]: createOrUpdateEntry restituisce %b\n", ret);
+        
     }
      
     // -------------------------------------------------------- //
@@ -85,6 +82,8 @@ public class Server extends UntypedActor {
             myClusterListener.tell(msg, getSelf()); //Are we interested in this? (Bind was successful)
         } else if (msg instanceof Hello) {
             Hello hello = (Hello) msg;
+            // --- the addressTable is used for concurrency purposes among different client
+            // --- requests
             addressTable.put(hello.getIpAddress(), hello.getPort());
             Hello newHello = new Hello(AddressResolver.getMyIpAddress(), tcpPort);
             getSender().tell(newHello, getSelf());
@@ -93,12 +92,13 @@ public class Server extends UntypedActor {
         } else if (msg instanceof Connected) {
             Connected conn = (Connected) msg;
             InetSocketAddress remoteAddress = conn.remoteAddress();
+            remoteClusterSystemPort = addressTable.remove(remoteAddress.getAddress().getHostAddress());
+            
             //myClusterListener.tell(conn, getSelf()); //Are we interested in this? (a client connected to us)
             
             
-            final ActorRef handler = getContext().actorOf(
-                Props.create(FileTransferActor.class, clusterSystemPort, 
-                    remoteAddress.getAddress(), getSender()));
+            final ActorRef handler = getContext().actorOf(Props.create(FileTransferActor.class, localClusterSystemPort, 
+                    remoteAddress.getAddress(), remoteClusterSystemPort, getSender()));
             getSender().tell(TcpMessage.register(handler), getSelf());
             log.debug("I, the server, have received a connection request and I've accepted it");
         }
@@ -117,8 +117,10 @@ public class Server extends UntypedActor {
                     log.error("Someone tried to send me the file {} I already own", request.getFileName());
                 }                
                 getSender().tell(new SimpleAnswer(true), getSelf());
+                log.debug("Received AllocationRequest. Sending out the response: true");
             } else {
                 getSender().tell(new SimpleAnswer(false), getSelf());
+                log.debug("Received AllocationRequest. Sending out the response: false");
             }
         } 
         else if (msg instanceof Handshake){
@@ -127,6 +129,7 @@ public class Server extends UntypedActor {
             // --- or if it's available. In the last case I have to mark it as  busy and
             // --- send back, togheder with the reply, the file's size and tags.
             AuthorizationReply reply = fileTable.testAndSet(handshake.getFileName(), handshake.getModifier());
+            log.debug("Received Handshake. Sending out AuthReply: {}",reply);
             getSender().tell(reply, getSelf());
         }
         
