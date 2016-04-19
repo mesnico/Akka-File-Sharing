@@ -57,7 +57,13 @@ public class Main {
                 //fileTransferSender is the name through which the Server lookup the sender
                 final ActorRef server = system.actorOf(Props.create(Server.class,7777,2220),"server");
                 
-                Handshake h = new Handshake(EnumBehavior.REQUEST,"inputFile.txt",EnumFileModifier.WRITE);
+                // --- fake the Allocation Request. Use OR this OR that in the node with port 2551
+                ArrayList<String> r = new ArrayList<>();
+                r.add("ciao");
+                AllocationRequest ar = new AllocationRequest("inputFile.txt",1024,r);
+                server.tell(ar, ActorRef.noSender());
+                
+                Handshake h = new Handshake(EnumBehavior.SEND,"inputFile.txt",EnumFileModifier.WRITE);
                 InetAddress ia = InetAddress.getLocalHost();
                 final ActorRef client = system.actorOf(Props.create(FileTransferActor.class,7777,ia,2551,h),"fileTransferSender");
             }
@@ -67,11 +73,13 @@ public class Main {
                 
                 final ActorRef server = system.actorOf(Props.create(Server.class,2551,2221),"server");
                 
-                // --- fake the Allocation Request
+                // --- fake the Allocation Request. Use OR this OR that in the node with port 7777
+                /*
                 ArrayList<String> r = new ArrayList<>();
                 r.add("ciao");
                 AllocationRequest ar = new AllocationRequest("inputFile.txt",1024,r);
                 server.tell(ar, ActorRef.noSender());
+                */
                 
             }
     }

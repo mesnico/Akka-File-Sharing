@@ -68,8 +68,10 @@ public class FileTransferActor extends UntypedActor {
     InetAddress interlocutorIp;  
     long size;
     FileOutputStream output;
-    final String filePath = Configuration.getFilePath();
-    final String tmpFilePath = Configuration.getTmpFilePath();
+    //TODO: ho tolto momentameante la final e ho, per motivi di debugging, 
+    // sovrascritto questi valori nel changeBehavior.
+    String filePath = Configuration.getFilePath();
+    String tmpFilePath = Configuration.getTmpFilePath();
     
     
     // ---------------------- //
@@ -79,7 +81,7 @@ public class FileTransferActor extends UntypedActor {
     // --- if something goes wrong when the receiver has not asked yet to the server,
     // --- the permission to receive the file, the rollBack procedure isn't dangerous 
     // --- (e.g. it could try to free some space although no space was allocated
-    public FileTransferActor(int clusterListenerPort, int remoteClusterSystemPort) {
+    public FileTransferActor(int clusterListenerPort, int remoteClusterSystemPort) { 
         this.remoteClusterSystemPort = remoteClusterSystemPort;
         this.localClusterSystemPort = clusterListenerPort;
         size = 0;
@@ -117,10 +119,12 @@ public class FileTransferActor extends UntypedActor {
     public void changeBehavior(){
         log.debug("My behavior is {}", handshake.getBehavior());
         if(handshake.getBehavior() == EnumBehavior.SEND){
+            filePath = "senderFiles/";
             // --- I change my behavior to tcpSender and I tell myself to start the protocol --- //
             getContext().become(tcpSender());  
             getSelf().tell("go", getSelf()); 
         } else {
+            filePath = "receiverFiles/";
             getContext().become(tcpReceiver()); 
         }
     }
@@ -399,7 +403,7 @@ public class FileTransferActor extends UntypedActor {
                                     // --- special case: create the file and end the protocol
                                     // --- in the close() handling the guiActor
                                     // --- will be informed of the success
-                                    File newFile = new File(filePath + handshake.getFileName() + "Out");
+                                    File newFile = new File(filePath + handshake.getFileName());
                                     if (!newFile.exists()){
                                         newFile.createNewFile();
                                         log.info("New file {} has been created", handshake.getFileName());
@@ -447,7 +451,7 @@ public class FileTransferActor extends UntypedActor {
                         terminate(EnumEnding.NOT_ENOUGH_SPACE);
                         log.info("There is not enough space for receiving file {}", handshake.getFileName());
                     } else {
-                        output = new FileOutputStream(filePath + handshake.getFileName() + "Out"); //TODO: non dovrebbe sollevare eccezioni, vedi documentazione  
+                        output = new FileOutputStream(filePath + handshake.getFileName()); //TODO: non dovrebbe sollevare eccezioni, vedi documentazione  
                     }
                 } else if (msg instanceof Received){
                     ByteBuffer buffer = ((Received) msg).data().toByteBuffer();
