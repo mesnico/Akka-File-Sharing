@@ -10,6 +10,7 @@ import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 
 import akka.actor.ActorRef;
+import java.io.File;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -58,12 +59,14 @@ public class Main {
                 final ActorRef server = system.actorOf(Props.create(Server.class,7777,2220),"server");
                 
                 // --- fake the Allocation Request. Use OR this OR that in the node with port 2551
+                /*
                 ArrayList<String> r = new ArrayList<>();
                 r.add("ciao");
                 AllocationRequest ar = new AllocationRequest("inputFile.txt",1024,r);
                 server.tell(ar, ActorRef.noSender());
+                */
                 
-                Handshake h = new Handshake(EnumBehavior.SEND,"inputFile.txt",EnumFileModifier.WRITE);
+                Handshake h = new Handshake(EnumBehavior.REQUEST,"robinHood.avi",EnumFileModifier.WRITE);
                 InetAddress ia = InetAddress.getLocalHost();
                 final ActorRef client = system.actorOf(Props.create(FileTransferActor.class,7777,ia,2551,h),"fileTransferSender");
             }
@@ -74,12 +77,17 @@ public class Main {
                 final ActorRef server = system.actorOf(Props.create(Server.class,2551,2221),"server");
                 
                 // --- fake the Allocation Request. Use OR this OR that in the node with port 7777
-                /*
+                
                 ArrayList<String> r = new ArrayList<>();
                 r.add("ciao");
                 AllocationRequest ar = new AllocationRequest("inputFile.txt",1024,r);
                 server.tell(ar, ActorRef.noSender());
-                */
+                r.add("cacca");
+                File newFile = new File("senderFiles/robinHood.avi");
+                Long fileSize = newFile.length();
+                ar = new AllocationRequest("robinHood.avi",fileSize,r);
+                server.tell(ar, ActorRef.noSender());
+                
                 
             }
     }

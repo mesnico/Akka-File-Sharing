@@ -92,8 +92,12 @@ public class Server extends UntypedActor {
         } else if (msg instanceof Connected) {
             Connected conn = (Connected) msg;
             InetSocketAddress remoteAddress = conn.remoteAddress();
-            remoteClusterSystemPort = addressTable.remove(remoteAddress.getAddress().getHostAddress());
             
+            Integer lookupPort = addressTable.remove(remoteAddress.getAddress().getHostAddress());
+            if(lookupPort == null){
+                log.error("Error while looking up the address table for address {}",remoteAddress);
+            }
+            remoteClusterSystemPort = lookupPort;
             //myClusterListener.tell(conn, getSelf()); //Are we interested in this? (a client connected to us)
             
             
@@ -135,14 +139,16 @@ public class Server extends UntypedActor {
         
         // --- FILE TRANSFER RESULT --- //
         else if (msg instanceof FileTransferResult){
-            FileTransferResult transferResult = ((FileTransferResult) msg);
-            String fileName = transferResult.getFileName();
+            FileTransferResult fileTransferResult = ((FileTransferResult) msg);
+            String fileName = fileTransferResult.getFileName();
+            log.debug("FileTransferResult is: {}", fileTransferResult );
         
-            switch(transferResult.getMessageType()){             
+            switch(fileTransferResult.getMessageType()){             
                 case FILE_RECEIVING_FAILED:
                     // --- In this case we have to delete the entry for the file, free the
                     // --- corresponding space and delete the received part of the file  
-                    if (transferResult.getFileModifier() == EnumFileModifier.WRITE){
+                    if (fileTransferResult.getFileModifier() == EnumFileModifier.WRITE){
+                        log.info("Deleting fileEntry and corresponding corrputed file {}", fileName);
                         FileElement e = fileTable.deleteEntry(fileName);
                         if (e == null){
                             log.info("The rollBack has no effect on {}", fileName);
@@ -156,7 +162,7 @@ public class Server extends UntypedActor {
                     }
                     break;
                 case FILE_SENT_SUCCESSFULLY:
-                    if (transferResult.getFileModifier() == EnumFileModifier.WRITE){
+                    if (fileTransferResult.getFileModifier() == EnumFileModifier.WRITE){
                         FileElement e = fileTable.deleteEntry(fileName);
                         if(e == null){
                             log.error("File entry for file {} does't exist", fileName);
@@ -167,12 +173,16 @@ public class Server extends UntypedActor {
                             File sentFile = new File(filePath + fileName);
                             if(sentFile.exists() && sentFile.canWrite()){
                                 sentFile.delete();
+                                log.debug("I've just deleted the sent file {}", fileName);
+                            } else {
+                                log.warning("File {} deleting failed. File does not exist: {}; File not writable: {}",
+                                        fileName, !sentFile.exists(), !sentFile.canWrite());
                             }
                         }
                     }
                     break;
                 case FILE_NO_MORE_BUSY:
-                    if (transferResult.getFileModifier() == EnumFileModifier.WRITE){
+                    if (fileTransferResult.getFileModifier() == EnumFileModifier.WRITE){
                         fileTable.freeEntry(fileName);
                     }
                     break;
