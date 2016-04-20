@@ -1,0 +1,27 @@
+[akka-stream]: Streaming large file from 1 server to 1 client
+https://groups.google.com/forum/m/#!topic/akka-user/PE1j1zmb5Bg
+
+[akka-stream]: Passing large files as akka streams in actor messages?
+https://groups.google.com/forum/#!topic/akka-user/Ay4SVS-Ufoc
+
+A second Akka remote example: sending object as messages
+http://alvinalexander.com/scala/akka-remote-sending-objects-messages
+
+Introduction to Akka Streams 
+http://boldradius.com/blog-post/VS0NpTAAADAACs_E/introduction-to-akka-streams
+
+
+Writing file to temporary directory
+http://stackoverflow.com/questions/13251003/writing-to-a-temporary-file-in-java
+
+Read all files in a folder
+http://stackoverflow.com/questions/1844688/read-all-files-in-a-folder
+
+
+[javafx samples]: http://download.oracle.com/otndocs/products/javafx/2/samples/Ensemble/index.html
+
+How to create a java string from the contents of a file
+http://stackoverflow.com/questions/326390/how-to-create-a-java-string-from-the-contents-of-a-file
+
+How to create a file from a java string
+http://stackoverflow.com/questions/1053467/how-do-i-save-a-string-to-a-text-file-using-java
