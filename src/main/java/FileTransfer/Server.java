@@ -19,6 +19,7 @@ import FileTransfer.messages.SendFreeSpaceSpread;
 import FileTransfer.messages.SimpleAnswer;
 import Startup.AddressResolver;
 import Startup.Configuration;
+import Startup.WatchMe;
 import java.net.InetSocketAddress;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
@@ -33,27 +34,25 @@ import akka.io.Tcp.Connected;
 import akka.io.TcpMessage;
 import java.io.File;
 import java.net.InetAddress;
-import java.util.ArrayList;
 import java.util.HashMap;
 
 
 public class Server extends UntypedActor {
-    LoggingAdapter log = Logging.getLogger(getContext().system(), this);
-    long myFreeSpace;
-    ActorSelection myClusterListener;
-    final FileTable fileTable;
-    int localClusterSystemPort;
-    int remoteClusterSystemPort;
-    int tcpPort;
-    final String filePath = Configuration.getFilePath();
-    final String tmpFilePath = Configuration.getTmpFilePath();
-    HashMap<String, Integer> addressTable;
+    private LoggingAdapter log = Logging.getLogger(getContext().system(), this);
+    private long myFreeSpace;
+    private ActorSelection myClusterListener;
+    private final FileTable fileTable;
+    private int localClusterSystemPort;
+    private int remoteClusterSystemPort;
+    private int tcpPort;
+    private final String filePath = Configuration.getFilePath();
+    private final String tmpFilePath = Configuration.getTmpFilePath();
+    private HashMap<String, Integer> addressTable;
+    private ActorSelection soulReaper;
     
     public Server(int localClusterSystemPort, int tcpPort) {
         this.localClusterSystemPort = localClusterSystemPort;
         this.tcpPort = tcpPort;
-        // TODO: the server, at boot time, has to read from the fileTable stored on disk
-        // which file it has, insert them in his fileTable, and calculate his freeSpace.
         myFreeSpace = Configuration.getMaxByteSpace();
         fileTable = new FileTable();
         addressTable = new HashMap<>();
@@ -63,6 +62,14 @@ public class Server extends UntypedActor {
     public void preStart() throws Exception {
         myClusterListener = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"
                 +localClusterSystemPort+"/user/clusterListener");
+        soulReaper = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"+localClusterSystemPort+"/user/soulReaper");
+        // TODO: the server, at boot time, has to read from the fileTable stored on disk
+        // which file it has, insert them in his fileTable, and calculate his freeSpace.
+        // --- The server calculates its free space and tell the clusterListener to spread it into the cluster
+        myClusterListener.tell(new SendFreeSpaceSpread(myFreeSpace), getSelf());
+        
+        //subscrive to to the soul reaper
+        soulReaper.tell(new WatchMe(), getSelf());
         
         final ActorRef tcpManager = Tcp.get(getContext().system()).manager();
         tcpManager.tell(TcpMessage.bind(

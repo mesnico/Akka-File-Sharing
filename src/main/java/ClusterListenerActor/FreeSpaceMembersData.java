@@ -54,36 +54,44 @@ public class FreeSpaceMembersData {
         });
     }
     
+    //Find a member by memberId
+    private FreeSpaceElement existsMember(BigInteger memberId){
+        for(FreeSpaceElement e : freeSpace)
+            if(e.getMemberID().equals(memberId)){
+                return e;
+            }
+        return null;
+    }
+    
     //Performs the load balancing to obtain the memberId of the member with
     //largest free space
     public BigInteger getHighestFreeSpaceMember(){
         return freeSpace.peek().getMemberID();
     }
-    //return the highest free space
+    
+    //Return the highest free space
     public long getHighestFreeSpace(){
         return freeSpace.peek().getFreeByteSpace();
     }
+    
     //Find the entry corresponding to the member id passed as parameter
     public boolean deleteByMember(BigInteger memberId){
-        for(FreeSpaceElement e : freeSpace)
-            if(e.getMemberID().equals(memberId))
-                return freeSpace.remove(e);
-        return false;
+        FreeSpaceElement toRemove = existsMember(memberId);
+        return freeSpace.remove(toRemove);
     }
-    //Add a new entry for the new member
-    public void newMember(BigInteger memberId, long space){
-        freeSpace.add(new FreeSpaceElement(memberId, space));
-    }
+    
     //Find the member and replace it with a another with the updated free space
-    //return the previous free space or -1 otherwise
-    public long updateMemberFreeSpace(BigInteger memberId, long newSpace){
-        for(FreeSpaceElement e : freeSpace)
-            if(e.getMemberID() == memberId){
-                freeSpace.add(new FreeSpaceElement(memberId, newSpace));
-                freeSpace.remove(e);
-                return e.getFreeByteSpace();
-            }
-        return -1;
+    //If the member is not present, it is created and returns false
+    //otherwise, it returns true
+    public boolean updateMemberFreeSpace(BigInteger memberId, long newSpace){
+        FreeSpaceElement element = existsMember(memberId);
+        if(element == null){
+            freeSpace.add(new FreeSpaceElement(memberId,newSpace));
+            return false;
+        } else {
+            element.setFreeByteSpace(newSpace);
+            return true;
+        }
     }
     
     @Override

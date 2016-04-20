@@ -10,6 +10,7 @@ import ClusterListenerActor.messages.CreationResponse;
 import ClusterListenerActor.messages.Shutdown;
 import ClusterListenerActor.messages.TagSearchRequest;
 import ClusterListenerActor.messages.TagSearchResponse;
+import FileTransfer.messages.SendFreeSpaceSpread;
 import GUI.messages.SearchRequest;
 import GUI.messages.SendCreationRequest;
 import Startup.AddressResolver;
@@ -50,17 +51,17 @@ import java.util.Random;
 public class ClusterListenerActor extends UntypedActor {
 
     LoggingAdapter log = Logging.getLogger(getContext().system(), this);
-    Cluster cluster = Cluster.get(getContext().system());
-    HashMembersData membersMap;
-    FreeSpaceMembersData membersFreeSpace;
-    FileInfoDistributedTable infoTable;
-    FoundFiles foundFiles;
-    String localAddress;
-    ActorSelection guiActor,soulReaper;
-    ActorRef mediator;
+    private Cluster cluster = Cluster.get(getContext().system());
+    private HashMembersData membersMap;
+    private FreeSpaceMembersData membersFreeSpace;
+    private FileInfoDistributedTable infoTable;
+    private FoundFiles foundFiles;
+    private String localAddress;
+    private ActorSelection guiActor,soulReaper,server;
+    private ActorRef mediator;
     
-    int clusterSystemPort;
-    final long myFreeSpace = new Random().nextLong();    //THIS IS GENERATED INTERNALLY BUT IT SHOULD NOT (should be taken from mine file table)
+    private int clusterSystemPort;
+    private long myFreeSpace = 0;
     
     public ClusterListenerActor(int basePort) throws Exception{
         //cluster port is that specified from the user; instead the client port (for handling of the files) is opened in clusterPort + 1
@@ -94,6 +95,7 @@ public class ClusterListenerActor extends UntypedActor {
         //create the references to the other actors
         soulReaper = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"+clusterSystemPort+"/user/soulReaper");
         guiActor   = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"+clusterSystemPort+"/user/gui");
+        server   = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"+clusterSystemPort+"/user/server");
         
         //subscrive to to the soul reaper
         soulReaper.tell(new WatchMe(), getSelf());
@@ -177,7 +179,10 @@ public class ClusterListenerActor extends UntypedActor {
             log.info("membersMap initialized: {}",membersMap);
         
         } else if (message instanceof SendFreeSpaceSpread){
-            int freeByteSpace = (SendFreeSpaceSpread)message.getFreeByteSpace();
+            long freeByteSpace =((SendFreeSpaceSpread) message).getFreeByteSpace();
+            // --- keep the freeSpace also in an updated clusterListener variable,
+            // --- so that members entering could be immediately notified
+            myFreeSpace = freeByteSpace;
             //tell my free space to all the other cluster nodes
             mediator.tell(new DistributedPubSubMediator.Publish("freeSpaceTopic", new FreeSpaceSpread(freeByteSpace)),
                 getSelf());
@@ -186,7 +191,7 @@ public class ClusterListenerActor extends UntypedActor {
             //insert the received information about the free space in the current priority queue.
             FreeSpaceSpread receivedFreeSpace = (FreeSpaceSpread) message;
             System.out.println(getSelf() + " " + getSender());
-            membersFreeSpace.newMember(HashUtilities.computeId(getAddress(getSender().path().address())), receivedFreeSpace.getFreeByteSpace());  //IS IT RIGHT?
+            membersFreeSpace.updateMemberFreeSpace(HashUtilities.computeId(getAddress(getSender().path().address())), receivedFreeSpace.getFreeByteSpace());  //IS IT RIGHT?
             log.info("Added {} with {} bytes free",getAddress(getSender().path().address()),receivedFreeSpace.getFreeByteSpace());
             log.debug("Free space infos: {}",membersFreeSpace);
 
@@ -303,10 +308,10 @@ public class ClusterListenerActor extends UntypedActor {
             getSelf().tell(new Shutdown(), getSelf());
         
         } else if (message instanceof Shutdown){
-            //leave the cluster and stop the system
+            // --- Leave the cluster and stop the system. Then stop all needed actors, myself too
             cluster.leave(cluster.selfAddress());
             
-            //send Poison Pill to me to kill myself
+            server.tell(PoisonPill.getInstance(), getSelf());
             getSelf().tell(PoisonPill.getInstance(), getSelf());
             
         } else if (message instanceof MemberEvent) {

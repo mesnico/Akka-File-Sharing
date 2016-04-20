@@ -2,6 +2,7 @@ package Startup;
 
 
 import ClusterListenerActor.ClusterListenerActor;
+import FileTransfer.Server;
 import akka.actor.ActorSystem;
 import akka.actor.Props;
 import com.typesafe.config.Config;
@@ -60,6 +61,9 @@ public class Main {
         
         //create the Soul Reaper actor to watch out all the others
         clusterSystem.actorOf(Props.create(SoulReaper.class), "soulReaper");
+        
+        //create the fileTransfer server
+        clusterSystem.actorOf(Props.create(Server.class,basePort,Configuration.getTcpPort()), "server");
             
         // Create an actor that handles cluster domain events
         clusterSystem.actorOf(Props.create(ClusterListenerActor.class, basePort),"clusterListener");

@@ -48,8 +48,6 @@ public class Main {
 
         // Create an Akka system and an actor that handles cluster domain events
             ActorSystem system = ActorSystem.create("ClusterSystem", config);
-            final ActorRef clusterListener = system.actorOf(Props.create(ClusterListener.class, port),
-                "clusterListener"+port);
             
             if(port.equals("7777")||port.equals("7779")){  
                 System.out.println("La mia porta è 7777\n");
