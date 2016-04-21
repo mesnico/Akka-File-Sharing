@@ -44,6 +44,7 @@ public class FXMLCreateController implements Initializable {
             System.out.println("You clicked Create into the new window!");
             System.out.println("Started create request");
             
+            //TODO: validate the tags
             //set the ModifiedFile
             List<String> tags = new ArrayList<>();
             String tag = tag1.getText();
