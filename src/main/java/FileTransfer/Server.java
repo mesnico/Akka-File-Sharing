@@ -18,7 +18,6 @@ import FileTransfer.messages.Hello;
 import FileTransfer.messages.SendFreeSpaceSpread;
 import FileTransfer.messages.SimpleAnswer;
 import Startup.AddressResolver;
-import Startup.Configuration;
 import Startup.WatchMe;
 import java.net.InetSocketAddress;
 import akka.actor.ActorRef;
@@ -32,6 +31,7 @@ import akka.io.Tcp.Bound;
 import akka.io.Tcp.CommandFailed;
 import akka.io.Tcp.Connected;
 import akka.io.TcpMessage;
+import com.typesafe.config.Config;
 import java.io.File;
 import java.net.InetAddress;
 import java.util.HashMap;
@@ -39,21 +39,24 @@ import java.util.HashMap;
 
 public class Server extends UntypedActor {
     private LoggingAdapter log = Logging.getLogger(getContext().system(), this);
+    private Config config = getContext().system().settings().config();
     private long myFreeSpace;
     private ActorSelection myClusterListener;
     private final FileTable fileTable;
     private int localClusterSystemPort;
     private int remoteClusterSystemPort;
     private int tcpPort;
-    private final String filePath = Configuration.getFilePath();
-    private final String tmpFilePath = Configuration.getTmpFilePath();
+    private final String filePath;
+    private final String tmpFilePath = System.getProperty("java.io.tmpdir");
     private HashMap<String, Integer> addressTable;
     private ActorSelection soulReaper;
     
-    public Server(int localClusterSystemPort, int tcpPort) {
-        this.localClusterSystemPort = localClusterSystemPort;
-        this.tcpPort = tcpPort;
-        myFreeSpace = Configuration.getMaxByteSpace();
+    public Server() {
+        filePath = config.getString("app-settings.file-path");
+        myFreeSpace = config.getLong("app-settings.dedicated-space");
+        tcpPort = config.getInt("app-settings.server-port");
+        localClusterSystemPort = config.getInt("akka.remote.netty.tcp.port");
+        System.out.println(filePath+"--"+myFreeSpace+"--"+tcpPort);
         fileTable = new FileTable();
         addressTable = new HashMap<>();
     }
@@ -62,7 +65,8 @@ public class Server extends UntypedActor {
     public void preStart() throws Exception {
         myClusterListener = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"
                 +localClusterSystemPort+"/user/clusterListener");
-        soulReaper = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"+localClusterSystemPort+"/user/soulReaper");
+        soulReaper = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"
+                +localClusterSystemPort+"/user/soulReaper");
         // TODO: the server, at boot time, has to read from the fileTable stored on disk
         // which file it has, insert them in his fileTable, and calculate his freeSpace.
         // --- The server calculates its free space and tell the clusterListener to spread it into the cluster
@@ -108,7 +112,7 @@ public class Server extends UntypedActor {
             //myClusterListener.tell(conn, getSelf()); //Are we interested in this? (a client connected to us)
             
             
-            final ActorRef handler = getContext().actorOf(Props.create(FileTransferActor.class, localClusterSystemPort, 
+            final ActorRef handler = getContext().actorOf(Props.create(FileTransferActor.class, 
                     remoteAddress.getAddress(), remoteClusterSystemPort, getSender()));
             getSender().tell(TcpMessage.register(handler), getSelf());
             log.debug("I, the server, have received a connection request and I've accepted it");

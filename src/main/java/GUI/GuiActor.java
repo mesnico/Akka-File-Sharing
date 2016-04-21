@@ -14,6 +14,7 @@ import akka.actor.ActorSelection;
 import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
+import com.typesafe.config.Config;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXMLLoader;
@@ -30,12 +31,13 @@ import javafx.stage.WindowEvent;
  */
 public class GuiActor extends UntypedActor{
     LoggingAdapter log = Logging.getLogger(getContext().system(), this);
+    private Config config = getContext().system().settings().config();
     private static ActorRef guiActorRef;
     private static ActorSelection clusterListenerActorRef,soulReaper;
     private final int clusterSystemPort;
     
-    public GuiActor(int basePort){
-        this.clusterSystemPort = basePort;
+    public GuiActor(){
+        this.clusterSystemPort = config.getInt("akka.remote.netty.tcp.port");
     }
     
     @Override 

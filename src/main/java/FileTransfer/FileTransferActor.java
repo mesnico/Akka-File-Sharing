@@ -28,7 +28,6 @@ import FileTransfer.messages.EnumFileModifier;
 import FileTransfer.messages.Hello;
 import FileTransfer.messages.SimpleAnswer;
 import Startup.AddressResolver;
-import Startup.Configuration;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
 import akka.actor.PoisonPill;
@@ -43,6 +42,7 @@ import akka.io.Tcp.ConnectionClosed;
 import akka.io.Tcp.Received;
 import akka.io.TcpMessage;
 import akka.japi.Procedure;
+import com.typesafe.config.Config;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.net.InetAddress;
@@ -53,25 +53,26 @@ import scala.concurrent.Await;
 import scala.concurrent.duration.FiniteDuration;
 
 public class FileTransferActor extends UntypedActor {
-    LoggingAdapter log = Logging.getLogger(getContext().system(), this);
-    ActorSelection myClusterListener;
-    ActorSelection myServer;
-    ActorSelection remoteServer;
-    ActorSelection myGuiActor;
-    ActorRef interlocutor;
-    ActorRef connectionHandler;
-    Handshake handshake;
-    int localClusterSystemPort;
-    int remoteClusterSystemPort;
+    private LoggingAdapter log = Logging.getLogger(getContext().system(), this);
+    private Config config = getContext().system().settings().config();
+    private ActorSelection myClusterListener;
+    private ActorSelection myServer;
+    private ActorSelection remoteServer;
+    private ActorSelection myGuiActor;
+    private ActorRef interlocutor;
+    private ActorRef connectionHandler;
+    private Handshake handshake;
+    private int localClusterSystemPort;
+    private int remoteClusterSystemPort;
     // --- tcpPort is used only when this FileTrransferActor is working as client
-    int tcpPort;
-    InetAddress interlocutorIp;  
-    long size;
-    FileOutputStream output;
+    private int tcpPort;
+    private InetAddress interlocutorIp;  
+    private long size;
+    private FileOutputStream output;
     //TODO: ho tolto momentameante la final e ho, per motivi di debugging, 
     // sovrascritto questi valori nel changeBehavior.
-    String filePath = Configuration.getFilePath();
-    String tmpFilePath = Configuration.getTmpFilePath();
+    private String filePath;
+    private String tmpFilePath = System.getProperty("java.io.tmpdir");
     
     
     // ---------------------- //
@@ -81,19 +82,19 @@ public class FileTransferActor extends UntypedActor {
     // --- if something goes wrong when the receiver has not asked yet to the server,
     // --- the permission to receive the file, the rollBack procedure isn't dangerous 
     // --- (e.g. it could try to free some space although no space was allocated
-    public FileTransferActor(int clusterListenerPort, int remoteClusterSystemPort) { 
+    public FileTransferActor(int remoteClusterSystemPort) { 
         this.remoteClusterSystemPort = remoteClusterSystemPort;
-        this.localClusterSystemPort = clusterListenerPort;
+        this.localClusterSystemPort = config.getInt("akka.remote.netty.tcp.port");
+        filePath = config.getString("app-settings.file-path");
         size = 0;
     }
     
     // --- Constructor called by the asker. The handshake variabile specify what the
     // --- asker has to do (e.g. send a file or request a file). The remoteServerIp is the IP address
     // --- of the server to which che asker will try to connect.
-    public FileTransferActor(int clusterListenerPort, InetAddress remoteServerIp, int remoteClusterSystemPort,
+    public FileTransferActor(InetAddress remoteServerIp, int remoteClusterSystemPort,
             Handshake handshake) {
-        this(clusterListenerPort, remoteClusterSystemPort);
-        this.tcpPort = tcpPort;
+        this(remoteClusterSystemPort);
         this.handshake = handshake;
         this.interlocutorIp = remoteServerIp;
         log.debug("Interlocutor IP is {}", remoteServerIp.getHostAddress());
@@ -101,9 +102,9 @@ public class FileTransferActor extends UntypedActor {
     
     // --- Constructor called by the responder. The handshake variabile is also used to distinguish
     // --- which part of the code the FileTransferActor has to execute (see preStart)
-    public FileTransferActor(int localClusterSystemPort, InetAddress askerIp, int remoteClusterSystemPort, 
+    public FileTransferActor(InetAddress askerIp, int remoteClusterSystemPort, 
             ActorRef connectionHandler ) {
-        this(localClusterSystemPort, remoteClusterSystemPort);
+        this(remoteClusterSystemPort);
         handshake = new Handshake(EnumBehavior.UNINITIALIZED);
         this.interlocutorIp = askerIp;
         this.connectionHandler = connectionHandler;
@@ -120,10 +121,10 @@ public class FileTransferActor extends UntypedActor {
         log.debug("My behavior is {}", handshake.getBehavior());
         if(handshake.getBehavior() == EnumBehavior.SEND){
             // --- I change my behavior to tcpSender and I tell myself to start the protocol --- //
-            getContext().become(tcpSender(connectionHandler));  
+            getContext().become(tcpSender());  
             getSelf().tell("go", getSelf()); 
         } else {
-            getContext().become(tcpReceiver(connectionHandler)); 
+            getContext().become(tcpReceiver()); 
         }
     }
     
@@ -223,7 +224,7 @@ public class FileTransferActor extends UntypedActor {
     // ----------------------------- //    
     // --- Here is specified what the FileTransferActor, when he assume the role of tcpSender,
     // --- has to do in response to the message that can arrive.
-    private Procedure<Object> tcpSender(final ActorRef handler) {
+    private Procedure<Object> tcpSender() {
         return new Procedure<Object>() {
             private FileTransferResult result;
             // --- I am the sender, so in case of early interruption of the protocol,
@@ -305,10 +306,10 @@ public class FileTransferActor extends UntypedActor {
                     SimpleAnswer answer = (SimpleAnswer)msg;
                     if (answer.getAnswer() == true){
                         Tcp.Event ack_or_notAck = new Tcp.NoAck$();
-                        handler.tell(TcpMessage.writeFile(filePath + handshake.getFileName(), 
+                        connectionHandler.tell(TcpMessage.writeFile(filePath + handshake.getFileName(), 
                                 0, size, ack_or_notAck), getSelf());
-                        handler.tell(TcpMessage.close(), getSelf()); 
-                        System.out.printf("handler is %s\n", handler.toString());
+                        connectionHandler.tell(TcpMessage.close(), getSelf()); 
+                        System.out.printf("handler is %s\n", connectionHandler.toString());
                         log.info("Close performed");
                     } else {
                         terminate(EnumEnding.FILE_SENDING_FAILED);  
@@ -354,7 +355,7 @@ public class FileTransferActor extends UntypedActor {
     // --------------------------- //
     // ---- RECEIVER BEHAVIOR ---- //
     // --------------------------- //        
-    private Procedure<Object> tcpReceiver(final ActorRef handler) {
+    private Procedure<Object> tcpReceiver() {
         return new Procedure<Object>() {
             private FileTransferResult result;
             // --- I ask the server to deallocate the fileEntry.
@@ -424,7 +425,7 @@ public class FileTransferActor extends UntypedActor {
                                         }
                                         
                                     }
-                                    handler.tell(TcpMessage.close(), getSender()); //magari dovremmo gesrtire il fatto che, se la dimensione era 0, non aggiorniamo lo spazio nella fileTable
+                                    connectionHandler.tell(TcpMessage.close(), getSender()); //magari dovremmo gesrtire il fatto che, se la dimensione era 0, non aggiorniamo lo spazio nella fileTable
                                 }
                             } else {  
                                 // --- READ request: I will give the permission without asking the server --- //
@@ -444,7 +445,7 @@ public class FileTransferActor extends UntypedActor {
                                         log.error("This should not happen: File {} already exists", handshake.getFileName());
                                         //TOD: si cancella e si ricrea
                                     }
-                                    handler.tell(TcpMessage.close(), getSender()); //magari dovremmo gesrtire il fatto che, se la dimensione era 0, non aggiorniamo lo spazio nella fileTable                                    
+                                    connectionHandler.tell(TcpMessage.close(), getSender()); //magari dovremmo gesrtire il fatto che, se la dimensione era 0, non aggiorniamo lo spazio nella fileTable                                    
                                 }
                             }
                             break;

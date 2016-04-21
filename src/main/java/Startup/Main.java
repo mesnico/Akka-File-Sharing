@@ -23,20 +23,7 @@ import java.net.UnknownHostException;
  * @author nicky
  */
 public class Main {
-    public static void main(String[] args) throws SocketException {
-        try{
-            if (args.length == 0)
-                startup("2551");
-            else
-                startup(args[0]);
-        } catch(UnknownHostException e){
-            System.err.println("Error initializing IP address. Do you have one?");
-        }
-    }
-
-    public static void startup(String strPort) throws UnknownHostException, SocketException{
-        int basePort = Integer.parseInt(strPort);
-        
+    public static void main(String[] args) throws UnknownHostException, SocketException{
         //creates the GUI
         new Thread() {
             @Override
@@ -48,8 +35,7 @@ public class Main {
         
         // Override the configuration of the port
         Config clusterConf = ConfigFactory
-                .parseString("akka.remote.netty.tcp.port=" + basePort + System.lineSeparator()
-                             +"akka.remote.netty.tcp.hostname=" + AddressResolver.getMyIpAddress())
+                .parseString("akka.remote.netty.tcp.hostname=" + AddressResolver.getMyIpAddress())
                 .withFallback(
                         ConfigFactory.load());
         //Config localConf = ConfigFactory.parseString("akka.remote.netty.tcp.port=" + (basePort+1)).withFallback(
@@ -63,10 +49,10 @@ public class Main {
         clusterSystem.actorOf(Props.create(SoulReaper.class), "soulReaper");
         
         //create the fileTransfer server
-        clusterSystem.actorOf(Props.create(Server.class,basePort,Configuration.getTcpPort()), "server");
+        clusterSystem.actorOf(Props.create(Server.class), "server");
             
         // Create an actor that handles cluster domain events
-        clusterSystem.actorOf(Props.create(ClusterListenerActor.class, basePort),"clusterListener");
-        clusterSystem.actorOf(Props.create(GuiActor.class,basePort).withDispatcher("javafx-dispatcher"), "gui");
+        clusterSystem.actorOf(Props.create(ClusterListenerActor.class),"clusterListener");
+        clusterSystem.actorOf(Props.create(GuiActor.class).withDispatcher("javafx-dispatcher"), "gui");
     }
 }

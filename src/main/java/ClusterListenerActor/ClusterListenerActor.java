@@ -33,6 +33,7 @@ import akka.cluster.pubsub.DistributedPubSub;
 import akka.cluster.pubsub.DistributedPubSubMediator;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
+import com.typesafe.config.Config;
 import java.math.BigInteger;
 import java.net.SocketException;
 import java.net.UnknownHostException;
@@ -51,6 +52,7 @@ import java.util.Random;
 public class ClusterListenerActor extends UntypedActor {
 
     LoggingAdapter log = Logging.getLogger(getContext().system(), this);
+    private Config config = getContext().system().settings().config();
     private Cluster cluster = Cluster.get(getContext().system());
     private HashMembersData membersMap;
     private FreeSpaceMembersData membersFreeSpace;
@@ -63,9 +65,8 @@ public class ClusterListenerActor extends UntypedActor {
     private int clusterSystemPort;
     private long myFreeSpace = 0;
     
-    public ClusterListenerActor(int basePort) throws Exception{
-        //cluster port is that specified from the user; instead the client port (for handling of the files) is opened in clusterPort + 1
-        this.clusterSystemPort = basePort;
+    public ClusterListenerActor() throws Exception{
+        this.clusterSystemPort = config.getInt("akka.remote.netty.tcp.port");
         
         //transforms the local reference to remote reference to uniformate hash accesses in case of remote actor
         Address mineAddress = getSelf().path().address();
