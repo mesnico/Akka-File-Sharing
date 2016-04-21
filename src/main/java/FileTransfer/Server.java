@@ -126,7 +126,8 @@ public class Server extends UntypedActor {
             AllocationRequest request = (AllocationRequest)msg;
             if (myFreeSpace >= request.getSize()){
                 myFreeSpace -= request.getSize();
-                FileElement newElement = new FileElement(false, request.getSize(),
+                boolean occupied = request.isBusy();
+                FileElement newElement = new FileElement(occupied, request.getSize(),
                         request.getTags());
                 if(fileTable.createOrUpdateEntry(request.getFileName(), newElement)==false){
                     log.error("Someone tried to send me the file {} I already own", request.getFileName());

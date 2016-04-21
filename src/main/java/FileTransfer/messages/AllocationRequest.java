@@ -16,11 +16,13 @@ public class AllocationRequest implements Serializable {
     private String fileName;
     private long size;
     private List<String> tags;
+    private boolean busy;
 
-    public AllocationRequest(String fileName, long size, List<String> tags) {
+    public AllocationRequest(String fileName, long size, List<String> tags, boolean busy) {
         this.fileName = fileName;
         this.size = size;
         this.tags = tags;
+        this.busy = busy;
     }
 
     public String getFileName() {
@@ -35,6 +37,10 @@ public class AllocationRequest implements Serializable {
         return tags;
     }
 
+    public boolean isBusy() {
+        return busy;
+    }
+
     public void setFileName(String fileName) {
         this.fileName = fileName;
     }
@@ -45,5 +51,9 @@ public class AllocationRequest implements Serializable {
 
     public void setTags(List<String> tags) {
         this.tags = tags;
+    }
+
+    public void setBusy(boolean busy) {
+        this.busy = busy;
     }
 }
