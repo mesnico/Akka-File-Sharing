@@ -23,6 +23,7 @@ import akka.actor.Terminated;
 import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
+import akka.io.Inet.SocketOption;
 import akka.io.Tcp;
 import akka.io.Tcp.CommandFailed;
 import akka.io.Tcp.Connected;
@@ -36,6 +37,7 @@ import java.io.FileOutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.util.Collections;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import scala.concurrent.Await;
 import scala.concurrent.duration.FiniteDuration;
@@ -156,14 +158,17 @@ public class FileTransferActor extends UntypedActor {
     }
     
     @Override
-    public void onReceive(Object msg) {
+    public void onReceive(Object msg) throws Exception {
         if (msg instanceof Hello){
             tcpPort = ((Hello) msg).getPort();
             
             // --- I use the received port from the server to connect to it.
             final ActorRef tcpManager = Tcp.get(getContext().system()).manager();
             InetSocketAddress remoteServerAddress = new InetSocketAddress(interlocutorIp, tcpPort);
-            tcpManager.tell(TcpMessage.connect(remoteServerAddress), getSelf());
+            InetSocketAddress localAddress = new InetSocketAddress(AddressResolver.getMyIpAddress(), 0);
+            FiniteDuration timeout = new FiniteDuration(10, SECONDS);
+            tcpManager.tell(TcpMessage.connect(remoteServerAddress, localAddress, 
+                    Collections.<SocketOption>emptyList(), timeout, false), getSelf());
             
         } else if (msg instanceof CommandFailed) {
             // --- I am the asker. The connectionHandler tells me the connection enstablishment failed
@@ -338,14 +343,8 @@ public class FileTransferActor extends UntypedActor {
                     // --- I enter in this branch if the file was successfully transferred.
                     // --- I communicate the outcome to the server, who is in charge of
                     // --- deleting the file from my hard disk and from the file table and
-                    // --- deallocate the space who was occupied by him.
-                        result = new FileTransferResult(
-                            EnumEnding.FILE_SENT_SUCCESSFULLY, handshake.getFileName(), handshake.getModifier());
-                        myServer.tell(result, getSelf());
-                        log.info("{} was successfully sent in {} mode to the remote peer", 
-                                handshake.getFileName(), handshake.getModifier().toString());
-                        getContext().unwatch(interlocutor);
-                        getSelf().tell(PoisonPill.getInstance(), getSelf());
+                    // --- deallocate the space who was occupied by him.                        
+                        terminate(EnumEnding.FILE_SENT_SUCCESSFULLY);
                     }
                 }
             }
@@ -378,6 +377,7 @@ public class FileTransferActor extends UntypedActor {
                  **********************************/
                 //interlocutor.tell(result, getSelf()); //toCheck
                 //rollBack();
+                // --- The unwatch prevents the Terminated message to be handled before the PoisonPill
                 getContext().unwatch(interlocutor);
                 getSelf().tell(PoisonPill.getInstance(), getSelf());
             }
@@ -492,6 +492,7 @@ public class FileTransferActor extends UntypedActor {
                             log.error("Error in receiving file {}: there is not enough space on my hard disk", handshake.getFileName());
                         }
                 } else if (msg instanceof Terminated){
+                    output.close();
                     terminate(EnumEnding.FILE_RECEIVING_FAILED);
                     log.error("The remote peer is falled, so I was unable to receive file {}. I will perform a roll back.", handshake.getFileName());                     
                 } else if(msg instanceof CommandFailed) {
@@ -500,21 +501,14 @@ public class FileTransferActor extends UntypedActor {
                     log.error("the OS kernel socket buffer was full");
                 } else if(msg instanceof ConnectionClosed) {
                     ConnectionClosed connection = (ConnectionClosed)msg;
+                    output.close(); //TODO: Throws IOException if an I/O error occurs. In case of exception, rollBack etc.
                     log.info("connectionClosed received, with errorCause {}", connection.getErrorCause());
                     if(connection.isErrorClosed()){
                         terminate(EnumEnding.FILE_RECEIVING_FAILED);
                         log.info("There was an error during the TcpConnection, so receiving of file {} has failed", handshake.getFileName());
                     } else {
-                        //all went the right direction: communicate to the clusterListener...
-                        output.close(); //TODO: Throws IOException if an I/O error occurs. In case of exception, rollBack etc.
-                        FileTransferResult result = new FileTransferResult(
-                                EnumEnding.FILE_RECEIVED_SCCESSFULLY, handshake.getFileName(), handshake.getModifier());
-                        myGuiActor.tell(result, getSelf());
-                        log.info("The file {} was successfully received in {} mode from the remote peer",
-                                handshake.getFileName(), handshake.getModifier().toString());
-                        // --- The unwatch prevents the Terminated message to be handled before the PoisonPill
-                        getContext().unwatch(interlocutor);
-                        getSelf().tell(PoisonPill.getInstance(), getSelf());
+                        // --- all went the right direction: communicate to the clusterListener...
+                        terminate(EnumEnding.FILE_RECEIVED_SCCESSFULLY);
                     }
                 }
             }

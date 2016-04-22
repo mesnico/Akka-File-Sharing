@@ -48,6 +48,6 @@ public class FileTransferResult implements Serializable {
     
     @Override
     public String toString(){
-        return "fileName: " + fileName + "in " + modifier + "mode; exit status = " + msg;
+        return "fileName: " + fileName + " in " + modifier + " mode; exit status = " + msg;
     }
 }
