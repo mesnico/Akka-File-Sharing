@@ -1,5 +1,6 @@
 package GUI;
 
+import FileTransfer.messages.AllocationRequest;
 import java.net.URL;
 import java.util.ResourceBundle;
 import javafx.event.ActionEvent;
@@ -14,10 +15,13 @@ public class FXMLModifyController implements Initializable {
        
        //the file under modify is: GUI.ModifiedFile.getName();
        
+       //AllocationRequest to update file's size
        //the file exits the busy-state
+       AllocationRequest newReq = new AllocationRequest(GUI.ModifiedFile.getName(),0,GUI.ModifiedFile.getTags(),false);
+
        //load distribution (only destination election)
-       //update tags
-       //send file
+       //update tags in the fileInfoTabe
+       //send file -> (i must say to the clusterListener to initiate the file transfer)
        
        GUI.getStage().show();
     }

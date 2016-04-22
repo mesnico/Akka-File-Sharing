@@ -7,6 +7,7 @@ package GUI;
 
 import ClusterListenerActor.messages.CreationResponse;
 import ClusterListenerActor.messages.TagSearchGuiResponse;
+import FileTransfer.messages.AllocationRequest;
 import Startup.AddressResolver;
 import Startup.WatchMe;
 import akka.actor.ActorRef;
@@ -15,6 +16,8 @@ import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import com.typesafe.config.Config;
+import java.awt.Desktop;
+import java.io.File;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXMLLoader;
@@ -30,14 +33,16 @@ import javafx.stage.WindowEvent;
  * @author nicky
  */
 public class GuiActor extends UntypedActor{
-    LoggingAdapter log = Logging.getLogger(getContext().system(), this);
+    private LoggingAdapter log = Logging.getLogger(getContext().system(), this);
     private Config config = getContext().system().settings().config();
+    private String filePath;
     private static ActorRef guiActorRef;
-    private static ActorSelection clusterListenerActorRef,soulReaper;
+    private static ActorSelection clusterListenerActorRef,soulReaper,server;
     private final int clusterSystemPort;
     
     public GuiActor(){
-        this.clusterSystemPort = config.getInt("akka.remote.netty.tcp.port");
+        clusterSystemPort = config.getInt("akka.remote.netty.tcp.port");
+        filePath = config.getString("app-settings.file-path");
     }
     
     @Override 
@@ -45,6 +50,7 @@ public class GuiActor extends UntypedActor{
         guiActorRef = getSelf();
         clusterListenerActorRef = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"+clusterSystemPort+"/user/clusterListener");
         soulReaper =              getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"+clusterSystemPort+"/user/soulReaper");
+        server =              getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"+clusterSystemPort+"/user/server");
         
         //subscrive to to the soul reaper
         soulReaper.tell(new WatchMe(), getSelf());
@@ -57,6 +63,14 @@ public class GuiActor extends UntypedActor{
             if(((CreationResponse) message).isSuccess()){
                 //from a request of creation I obtained positive response => Start che creation and modify of the new file
                 GUI.getSecondaryStage().close();
+                
+                //tell to the server to create a new entry for the FileTable
+                AllocationRequest newReq = new AllocationRequest(GUI.ModifiedFile.getName(),0,GUI.ModifiedFile.getTags(),true);
+                server.tell(newReq, getSelf());
+                File file = new File(filePath + GUI.ModifiedFile.getName());
+                file.createNewFile();
+                file.setWritable(true);
+                Desktop.getDesktop().edit(file);
                 
                 try {
                     FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/fxml/Modify.fxml"));
