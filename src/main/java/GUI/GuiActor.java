@@ -45,6 +45,10 @@ public class GuiActor extends UntypedActor{
         filePath = config.getString("app-settings.file-path");
     }
     
+    public static String getFilePath(){
+        return filePath;
+    }
+    
     @Override 
     public void preStart() throws Exception{
         guiActorRef = getSelf();
@@ -113,6 +117,9 @@ public class GuiActor extends UntypedActor{
         
         /*
         if(message instanceof ModifyRequest){
+            
+        }
+        if(message instanceof ReadRequest){
             
         }*/    
     }

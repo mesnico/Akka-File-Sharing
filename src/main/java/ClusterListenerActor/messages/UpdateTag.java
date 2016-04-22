@@ -7,34 +7,31 @@ package ClusterListenerActor.messages;
 
 import java.io.Serializable;
 import java.math.BigInteger;
-import java.util.List;
 
 /**
  *
  * @author francescop
  */
-public class EndModify implements Serializable{
+public class UpdateTag  implements Serializable{
     String fileName;
-    List<String> tags;
-    long fileByteSize;
+    String tag;
+    BigInteger ownerId;
 
-    public EndModify(String fileName, List<String> tags, long fileByteSize) {
+    public UpdateTag(String fileName, String tag, BigInteger ownerId) {
         this.fileName = fileName;
-        this.tags = tags;
-        this.fileByteSize = fileByteSize;
-        //this.ownerId = ownerId;
+        this.tag = tag;
+        this.ownerId = ownerId;
     }
 
     public String getFileName() {
         return fileName;
     }
 
-    public List<String> getTags() {
-        return tags;
+    public String getTag() {
+        return tag;
     }
 
-    public long getFileByteSize() {
-        return fileByteSize;
+    public BigInteger getOwnerId() {
+        return ownerId;
     }
-    
 }

@@ -5,11 +5,16 @@ import ClusterListenerActor.messages.EndModify;
 import ClusterListenerActor.messages.FileInfoTransfer;
 import ClusterListenerActor.messages.FreeSpaceSpread;
 import ClusterListenerActor.messages.CreationRequest;
-import ClusterListenerActor.messages.AddTag;
+import ClusterListenerActor.messages.UpdateTag;
 import ClusterListenerActor.messages.CreationResponse;
 import ClusterListenerActor.messages.Shutdown;
+import ClusterListenerActor.messages.SpreadTags;
 import ClusterListenerActor.messages.TagSearchRequest;
 import ClusterListenerActor.messages.TagSearchResponse;
+import FileTransfer.FileTransferActor;
+import FileTransfer.messages.EnumBehavior;
+import FileTransfer.messages.EnumFileModifier;
+import FileTransfer.messages.Handshake;
 import FileTransfer.messages.SendFreeSpaceSpread;
 import GUI.messages.SearchRequest;
 import GUI.messages.SendCreationRequest;
@@ -19,6 +24,7 @@ import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
 import akka.actor.Address;
 import akka.actor.PoisonPill;
+import akka.actor.Props;
 import akka.actor.UntypedActor;
 import akka.cluster.Cluster;
 import akka.cluster.ClusterEvent;
@@ -35,10 +41,10 @@ import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import com.typesafe.config.Config;
 import java.math.BigInteger;
+import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.List;
-import java.util.Random;
 
 /*
  * To change this license header, choose License Headers in Project Properties.
@@ -52,17 +58,17 @@ import java.util.Random;
 public class ClusterListenerActor extends UntypedActor {
 
     LoggingAdapter log = Logging.getLogger(getContext().system(), this);
-    private Config config = getContext().system().settings().config();
-    private Cluster cluster = Cluster.get(getContext().system());
-    private HashMembersData membersMap;
-    private FreeSpaceMembersData membersFreeSpace;
-    private FileInfoDistributedTable infoTable;
-    private FoundFiles foundFiles;
-    private String localAddress;
+    private final Config config = getContext().system().settings().config();
+    private final Cluster cluster = Cluster.get(getContext().system());
+    private final HashMembersData membersMap;
+    private final FreeSpaceMembersData membersFreeSpace;
+    private final FileInfoDistributedTable infoTable;
+    private final FoundFiles foundFiles;
+    private final String localAddress;
     private ActorSelection guiActor,soulReaper,server;
     private ActorRef mediator;
     
-    private int clusterSystemPort;
+    private final int clusterSystemPort;
     private long myFreeSpace = 0;
     
     public ClusterListenerActor() throws Exception{
@@ -197,33 +203,58 @@ public class ClusterListenerActor extends UntypedActor {
             log.debug("Free space infos: {}",membersFreeSpace);
 
         } else if (message instanceof EndModify) {//this message is generated at the end of the modify operation, to begine the load distribution
-            //I have just created a new file.
             EndModify mNewFileCreation = (EndModify) message;
-            //load distribution
-            long biggestFreeSpace = membersFreeSpace.getHighestFreeSpace();
-            if(biggestFreeSpace < mNewFileCreation.getFileByteSize()){
-                //oh no! the file cannot be delivered
-                //smaller size please
-            } else{
-                BigInteger ownerId = membersFreeSpace.getHighestFreeSpaceMember();
-
-                //Distribute info among other nodes
-                for(String tag : mNewFileCreation.getTags()){
-                    Member responsible = membersMap.getResponsibleMemberById(HashUtilities.computeId(tag));
-                    getContext().actorSelection(responsible.address() + "/user/clusterListener")
-                        .tell(new AddTag(tag,mNewFileCreation.getFileName(),ownerId), getSelf());
-                }
-                /*this had to be done durig the "Check of the name"
-                * instad now I have to set the new owner and new file size
-
-                //Also the file name information has to be stored as like as happens for other tags
-                String fileName = mNewFileCreation.getFileName();
-                Member responsible = membersMap.getResponsibleById(HashUtilities.computeId(fileName));
-                    getContext().actorSelection(responsible.address() + "/user/clusterListener")
-                        .tell(new AddTag(fileName,mNewFileCreation.getFileName(),mNewFileCreation.getOwnerId()), getSelf());
-                */
+            String fileName = mNewFileCreation.getFileName();
+            
+            //check for size constraints
+            if(myFreeSpace < mNewFileCreation.getFileByteSize()){
+                //OH NO... the size of the file after the modify is greater then my actual free space size
+                //send a message to GuiActor to act accordingly
+                //(possible actions are: change modifications, discard changes, delete file)
+                //Alessandro says "se ci rimane tempo facciamo l'annullamento delle modifiche, ma per adesso il file si cancella!"
                 
+            }else{ //all rigth... proceed with load distribution
+                //load distribution
+                BigInteger newOwnerId = membersFreeSpace.getHighestFreeSpaceMember();
+                Member newOwner = membersMap.getMemberById(newOwnerId);
+                
+                //check if i'm the choosen by the load distribution
+                if(newOwnerId == HashUtilities.computeId(getAddress(getSelf().path().address()))){
+                    //no transfer is needed
+                    
+                    //Just update tags into infoTable
+                    getSelf().tell(new SpreadTags(fileName,mNewFileCreation.getTags(),newOwnerId),getSelf());
+                }else{
+                    //file transfer SEND
+                    final ActorRef asker = getContext().actorOf(Props
+                            .create(FileTransferActor.class, 
+                                    InetAddress.getByName(newOwner.address().host().get()), 
+                                    (int) newOwner.address().port().get(), 
+                                    new Handshake(EnumBehavior.SEND,fileName)),
+                            "fileTransferSender");
+                    getContext().actorSelection(newOwner + "/user/clusterListener")
+                            .tell( null ,getSelf());
+                    
+                    //don't need to update tags... this is performed at the end of the file send
+                    //now we have just to create the file into the FileTable of my server
+                }
             }
+            
+        } else if (message instanceof SpreadTags){
+            //used from the EndModify and end of file transfer
+            
+            SpreadTags msg = (SpreadTags) message;
+            for(String tag : msg.getTags()){
+                Member responsible = membersMap.getResponsibleMemberById(HashUtilities.computeId(tag));
+                getContext().actorSelection(responsible.address() + "/user/clusterListener")
+                    .tell(new UpdateTag(tag,msg.getFileName(),msg.getOwnerId()), getSelf());
+            }
+            
+            //Also the file name information has to be stored as like as other tags
+            Member responsible = membersMap.getResponsibleMemberById(HashUtilities.computeId(msg.getFileName()));
+            getContext().actorSelection(responsible.address() + "/user/clusterListener")
+                .tell(new UpdateTag(msg.getFileName(),msg.getFileName(),msg.getOwnerId()), getSelf());
+                    
             
         } else if (message instanceof SendCreationRequest){
             //I send the creation request (the filename tag) to the responsible member
@@ -281,9 +312,9 @@ public class ClusterListenerActor extends UntypedActor {
             //tell the GUI actor the calculated response list
             guiActor.tell(foundFiles.createGuiResponse(), getSelf());
             
-        } else if (message instanceof AddTag) {
+        } else if (message instanceof UpdateTag) {
             //Receved a information for wich I'm the responsible
-            AddTag mAddTag = (AddTag) message;
+            UpdateTag mAddTag = (UpdateTag) message;
             infoTable.updateTag(mAddTag.getTag(), mAddTag.getFileName(), mAddTag.getOwnerId());
         
         } else if (message instanceof FileInfoTransfer) {
