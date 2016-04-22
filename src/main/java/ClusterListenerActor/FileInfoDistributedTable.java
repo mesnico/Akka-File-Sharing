@@ -83,7 +83,7 @@ public class FileInfoDistributedTable {
         FileInfoTransfer fit = new FileInfoTransfer();
         for(Iterator<HashMap.Entry<String,List<FileInfoElement>>>it=fileInfo.entrySet().iterator();it.hasNext();){
             HashMap.Entry<String, List<FileInfoElement>> entry = it.next();
-            if(membersMap.getResponsibleById(HashUtilities.computeId(entry.getKey())).compareTo(nodeId)!=0){
+            if(membersMap.getResponsibleById(Utilities.computeId(entry.getKey())).compareTo(nodeId)!=0){
                 fit.addEntry(entry.getKey(), entry.getValue());
                 it.remove();
             }

@@ -9,6 +9,8 @@
 
 package FileTransfer;
 
+import ClusterListenerActor.Utilities;
+import ClusterListenerActor.messages.SpreadTags;
 import FileTransfer.messages.AllocationRequest;
 import FileTransfer.messages.AuthorizationReply;
 import FileTransfer.messages.EnumFileModifier;
@@ -33,7 +35,6 @@ import akka.io.Tcp.Connected;
 import akka.io.TcpMessage;
 import com.typesafe.config.Config;
 import java.io.File;
-import java.net.InetAddress;
 import java.util.HashMap;
 
 
@@ -211,6 +212,11 @@ public class Server extends UntypedActor {
                     if (fileTransferResult.getFileModifier() == EnumFileModifier.WRITE){
                         SendFreeSpaceSpread spaceToPublish = new SendFreeSpaceSpread(myFreeSpace);
                         myClusterListener.tell(spaceToPublish, getSelf());
+                        
+                        SpreadTags tagsMessage = new SpreadTags(fileName, 
+                                fileTable.getFileElement(fileName).getTags(), 
+                                Utilities.computeId(Utilities.getAddress(getSelf().path().address(), localClusterSystemPort)));
+                        myClusterListener.tell(tagsMessage, null);
                     }
                     break;
                     

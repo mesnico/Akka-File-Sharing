@@ -101,6 +101,10 @@ public class FileTable {
         return sum;
     }
     
+    public FileElement getFileElement(String fileName){
+        return fileTable.get(fileName);
+    }
+    
     /*
     public long getFileSize(String fileName){
         return fileTable.get(fileName).getSize();

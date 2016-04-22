@@ -35,7 +35,7 @@ import javafx.stage.WindowEvent;
 public class GuiActor extends UntypedActor{
     private LoggingAdapter log = Logging.getLogger(getContext().system(), this);
     private Config config = getContext().system().settings().config();
-    private String filePath;
+    private static String filePath;
     private static ActorRef guiActorRef;
     private static ActorSelection clusterListenerActorRef,soulReaper,server;
     private final int clusterSystemPort;

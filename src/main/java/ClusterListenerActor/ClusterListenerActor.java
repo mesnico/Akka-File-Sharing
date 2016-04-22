@@ -76,7 +76,7 @@ public class ClusterListenerActor extends UntypedActor {
         
         //transforms the local reference to remote reference to uniformate hash accesses in case of remote actor
         Address mineAddress = getSelf().path().address();
-        localAddress = getAddress(mineAddress);
+        localAddress = Utilities.getAddress(mineAddress,clusterSystemPort);
         
         //construct the members map and member free space map
         membersMap = new HashMembersData();
@@ -120,19 +120,19 @@ public class ClusterListenerActor extends UntypedActor {
             log.info("Subscribed to freeSpace Topic");
         } else if (message instanceof MemberUp) {
             MemberUp mMemberUp = (MemberUp) message;
-            log.info("{} -->Member is Up: {}", localAddress, getAddress(mMemberUp.member().address()));
+            log.info("{} -->Member is Up: {}", localAddress, Utilities.getAddress(mMemberUp.member().address(),clusterSystemPort));
 
             //inserts the new member in the map
-            membersMap.newMember(HashUtilities.computeId(getAddress(mMemberUp.member().address())), mMemberUp.member());    //IS IT RIGHT?
+            membersMap.newMember(Utilities.computeId(Utilities.getAddress(mMemberUp.member().address(),clusterSystemPort)), mMemberUp.member());    //IS IT RIGHT?
             log.info("new Member inserted in membersMap: {}",mMemberUp.member());
             log.debug("Current membersMap status: {} ",membersMap);
             
             //transfer control of the right tags to the new node, if it is my predecessor.
             //if it is my predecessor
-            if(HashUtilities.computeId(getAddress(getSelf().path().address())).compareTo(
-                    membersMap.getSuccessorById(HashUtilities.computeId(getAddress(mMemberUp.member().address()))))==0){
+            if(Utilities.computeId(Utilities.getAddress(getSelf().path().address(),clusterSystemPort)).compareTo(
+                    membersMap.getSuccessorById(Utilities.computeId(Utilities.getAddress(mMemberUp.member().address(),clusterSystemPort))))==0){
                 //collect the infoTable entries to be passed to the arrived node
-                FileInfoTransfer fit = infoTable.buildFileInfoTransfer(membersMap,HashUtilities.computeId(getAddress(getSelf().path().address()))); 
+                FileInfoTransfer fit = infoTable.buildFileInfoTransfer(membersMap,Utilities.computeId(Utilities.getAddress(getSelf().path().address(),clusterSystemPort))); 
                 //send the infos to the new responsible
                 getContext().actorSelection(mMemberUp.member().address() + "/user/clusterListener")
                         .tell(fit, getSelf());
@@ -158,7 +158,7 @@ public class ClusterListenerActor extends UntypedActor {
             }
             
             //in any case, the member is removed from the local structure
-            Member removed = membersMap.deleteMemberById(HashUtilities.computeId(getAddress(mMemberRemoved.member().address())));
+            Member removed = membersMap.deleteMemberById(Utilities.computeId(Utilities.getAddress(mMemberRemoved.member().address(),clusterSystemPort)));
             if(removed == null){
                 log.error("Member {} does not exist in membersMap!!",mMemberRemoved.member());
             } else {
@@ -168,7 +168,7 @@ public class ClusterListenerActor extends UntypedActor {
             
             //the member is also removed from the free space queue
             //the only way is to search it by member address and to delete it.
-            boolean exists = membersFreeSpace.deleteByMember(HashUtilities.computeId(getAddress(mMemberRemoved.member().address())));
+            boolean exists = membersFreeSpace.deleteByMember(Utilities.computeId(Utilities.getAddress(mMemberRemoved.member().address(),clusterSystemPort)));
             if(!exists){
                 log.error("Member {} does not exist in membersFreeSpace!!",mMemberRemoved.member());
             } else {
@@ -180,7 +180,7 @@ public class ClusterListenerActor extends UntypedActor {
             CurrentClusterState state = (CurrentClusterState) message;
             for (Member member : state.getMembers()) {
                 if (member.status().equals(MemberStatus.up())) {
-                    membersMap.newMember(HashUtilities.computeId(member.address().hostPort()),member);
+                    membersMap.newMember(Utilities.computeId(member.address().hostPort()),member);
                 }
             }
             log.info("membersMap initialized: {}",membersMap);
@@ -198,8 +198,8 @@ public class ClusterListenerActor extends UntypedActor {
             //insert the received information about the free space in the current priority queue.
             FreeSpaceSpread receivedFreeSpace = (FreeSpaceSpread) message;
             System.out.println(getSelf() + " " + getSender());
-            membersFreeSpace.updateMemberFreeSpace(HashUtilities.computeId(getAddress(getSender().path().address())), receivedFreeSpace.getFreeByteSpace());  //IS IT RIGHT?
-            log.info("Added {} with {} bytes free",getAddress(getSender().path().address()),receivedFreeSpace.getFreeByteSpace());
+            membersFreeSpace.updateMemberFreeSpace(Utilities.computeId(Utilities.getAddress(getSender().path().address(),clusterSystemPort)), receivedFreeSpace.getFreeByteSpace());  //IS IT RIGHT?
+            log.info("Added {} with {} bytes free",Utilities.getAddress(getSender().path().address(),clusterSystemPort),receivedFreeSpace.getFreeByteSpace());
             log.debug("Free space infos: {}",membersFreeSpace);
 
         } else if (message instanceof EndModify) {//this message is generated at the end of the modify operation, to begine the load distribution
@@ -219,7 +219,7 @@ public class ClusterListenerActor extends UntypedActor {
                 Member newOwner = membersMap.getMemberById(newOwnerId);
                 
                 //check if i'm the choosen by the load distribution
-                if(newOwnerId == HashUtilities.computeId(getAddress(getSelf().path().address()))){
+                if(newOwnerId == Utilities.computeId(Utilities.getAddress(getSelf().path().address(),clusterSystemPort))){
                     //no transfer is needed
                     
                     //Just update tags into infoTable
@@ -245,13 +245,13 @@ public class ClusterListenerActor extends UntypedActor {
             
             SpreadTags msg = (SpreadTags) message;
             for(String tag : msg.getTags()){
-                Member responsible = membersMap.getResponsibleMemberById(HashUtilities.computeId(tag));
+                Member responsible = membersMap.getResponsibleMemberById(Utilities.computeId(tag));
                 getContext().actorSelection(responsible.address() + "/user/clusterListener")
                     .tell(new UpdateTag(tag,msg.getFileName(),msg.getOwnerId()), getSelf());
             }
             
             //Also the file name information has to be stored as like as other tags
-            Member responsible = membersMap.getResponsibleMemberById(HashUtilities.computeId(msg.getFileName()));
+            Member responsible = membersMap.getResponsibleMemberById(Utilities.computeId(msg.getFileName()));
             getContext().actorSelection(responsible.address() + "/user/clusterListener")
                 .tell(new UpdateTag(msg.getFileName(),msg.getFileName(),msg.getOwnerId()), getSelf());
                     
@@ -261,18 +261,18 @@ public class ClusterListenerActor extends UntypedActor {
             //so that it can perform the checks and return me a CreationResponse
             SendCreationRequest cr = (SendCreationRequest) message;
             Member responsibleMember = membersMap.getResponsibleMemberById(
-                HashUtilities.computeId(cr.getFileName()));
+                Utilities.computeId(cr.getFileName()));
             getContext().actorSelection(responsibleMember.address() + "/user/clusterListener")
                 .tell(new CreationRequest(cr.getFileName()), getSelf());
            
         } else if (message instanceof CreationRequest){
             //i am the responsible for the new filename tag. I have to add it to my FileInfoDistributedTable, only if it does not exist yet.
             String fileName = ((CreationRequest)message).getFileName();
-            boolean success = infoTable.testAndSet(fileName, fileName, HashUtilities.computeId(getAddress(getSender().path().address())));
+            boolean success = infoTable.testAndSet(fileName, fileName, Utilities.computeId(Utilities.getAddress(getSender().path().address(),clusterSystemPort)));
             getSender().tell(new CreationResponse(success), getSelf());
             
             log.debug("Received a creation request. \n Success:{}\nCurrent info table is: {}",success,infoTable.toString());
-            log.debug("tag id: {}",HashUtilities.computeId(fileName));
+            log.debug("tag id: {}",Utilities.computeId(fileName));
             
         } else if (message instanceof CreationResponse){
             //forward the response to the GUI actor
@@ -287,7 +287,7 @@ public class ClusterListenerActor extends UntypedActor {
             //foreach tag (tags + filename) I send the request for the search
             for(String tag : sr.getSearchString().split(" ")){
                 responsibleMember = membersMap.getResponsibleMemberById(
-                    HashUtilities.computeId(tag));
+                    Utilities.computeId(tag));
                 getContext().actorSelection(responsibleMember.address() + "/user/clusterListener")
                     .tell(new TagSearchRequest(tag), getSelf());
                 System.out.println("sent tag for "+tag);
@@ -329,10 +329,10 @@ public class ClusterListenerActor extends UntypedActor {
             log.info("The system is going to shutdown!");
             //transfer all my infos to my successor node
             Member newInfoResponsable = membersMap.getSuccessorMemberById(
-                    HashUtilities.computeId(getAddress(getSelf().path().address())));
+                    Utilities.computeId(Utilities.getAddress(getSelf().path().address(),clusterSystemPort)));
             //prepare the fileinfo transfer message
             FileInfoTransfer fit = infoTable.buildFileInfoTransfer(membersMap,
-                    HashUtilities.computeId(getAddress(newInfoResponsable.address())));
+                    Utilities.computeId(Utilities.getAddress(newInfoResponsable.address(),clusterSystemPort)));
             //send the infos to the new responsible
             getContext().actorSelection(newInfoResponsable.address() + "/user/clusterListener")
                     .tell(fit, getSelf());
@@ -352,10 +352,5 @@ public class ClusterListenerActor extends UntypedActor {
         } else {
             unhandled(message);
         }
-    }
-    
-    //returns a string containing the remote address
-    private String getAddress(Address address) throws UnknownHostException, SocketException{
-        return (address.hasLocalScope()) ? address.hostPort()+"@"+AddressResolver.getMyIpAddress()+":"+clusterSystemPort : address.hostPort();
     }
 }
