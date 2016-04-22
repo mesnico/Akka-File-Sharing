@@ -42,6 +42,7 @@ public class Server extends UntypedActor {
     private Config config = getContext().system().settings().config();
     private long myFreeSpace;
     private ActorSelection myClusterListener;
+    private ActorSelection myGuiActor;    
     private final FileTable fileTable;
     private int localClusterSystemPort;
     private int remoteClusterSystemPort;
@@ -60,6 +61,36 @@ public class Server extends UntypedActor {
         fileTable = new FileTable();
         addressTable = new HashMap<>();
     }
+    
+    // ----------------------------- //
+    // ---- ROLL BACK FUNCTIONS ---- //
+    // ----------------------------- //
+    private void senderRollBack(FileTransferResult fileTransferResult){
+        String fileName = fileTransferResult.getFileName();
+        if (fileTransferResult.getFileModifier() == EnumFileModifier.WRITE){
+            fileTable.freeEntry(fileName);
+        }
+    }
+
+    private void receiverRollBack(FileTransferResult fileTransferResult){
+        // --- We have to delete the entry for the file, free the
+        // --- corresponding space and delete the received part of the file  
+        String fileName = fileTransferResult.getFileName();
+        if (fileTransferResult.getFileModifier() == EnumFileModifier.WRITE){
+            log.info("Deleting fileEntry and corresponding corrputed file {}", filePath + fileName);
+            FileElement e = fileTable.deleteEntry(fileName);
+            if (e == null){
+                log.info("The rollBack has no effect on {}", fileName);
+            } else {
+                myFreeSpace += e.getSize();
+            }
+            File corruptedFile = new File(filePath + fileName);
+            if(corruptedFile.exists() && corruptedFile.canWrite()){
+                corruptedFile.delete();
+                log.debug("Now the file must be deleted");
+            }                        
+        }
+    }
 
     @Override
     public void preStart() throws Exception {
@@ -67,21 +98,22 @@ public class Server extends UntypedActor {
                 +localClusterSystemPort+"/user/clusterListener");
         soulReaper = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"
                 +localClusterSystemPort+"/user/soulReaper");
+        myGuiActor = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"
+                +localClusterSystemPort+"/user/gui"); 
         // TODO: the server, at boot time, has to read from the fileTable stored on disk
         // which file it has, insert them in his fileTable, and calculate his freeSpace.
         // --- The server calculates its free space and tell the clusterListener to spread it into the cluster
         myClusterListener.tell(new SendFreeSpaceSpread(myFreeSpace), getSelf());
         
-        //subscrive to to the soul reaper
+        // --- Subscrive to to the soul reaper
         soulReaper.tell(new WatchMe(), getSelf());
         
         final ActorRef tcpManager = Tcp.get(getContext().system()).manager();
         tcpManager.tell(TcpMessage.bind(
                     getSelf(), 
-                    new InetSocketAddress(InetAddress.getLocalHost(), tcpPort), 
+                    new InetSocketAddress(AddressResolver.getMyIpAddress(), tcpPort), 
                     100)
                 , getSelf());
-        
     }
      
     // -------------------------------------------------------- //
@@ -118,15 +150,16 @@ public class Server extends UntypedActor {
             log.debug("I, the server, have received a connection request and I've accepted it");
         }
         
-        // --------------------------------- //
-        // ---- SERVER GENERAL BEHAVIOR ---- //
-        // --------------------------------- //
-        // --- AUTHORIZATION REQUEST --- //
+        // ---------------------------- //
+        // ---- ALLOCATION REQUEST ---- //
+        // ---------------------------- //
         else if (msg instanceof AllocationRequest){
+            //log.debug("An allocationRequest arrived, with ");
             AllocationRequest request = (AllocationRequest)msg;
             if (myFreeSpace >= request.getSize()){
                 myFreeSpace -= request.getSize();
-                FileElement newElement = new FileElement(false, request.getSize(),
+                boolean occupied = request.isBusy();
+                FileElement newElement = new FileElement(occupied, request.getSize(),
                         request.getTags());
                 if(fileTable.createOrUpdateEntry(request.getFileName(), newElement)==false){
                     log.error("Someone tried to send me the file {} I already own", request.getFileName());
@@ -138,40 +171,73 @@ public class Server extends UntypedActor {
                 log.debug("Received AllocationRequest. Sending out the response: false");
             }
         } 
+        
+        // --------------------------- //
+        // ---- HANDSHAKE MESSAGE ---- //
+        // --------------------------- //        
         else if (msg instanceof Handshake){
-            Handshake handshake = (Handshake)msg;
             // --- A FileTransferActor wants to send a file. I have to verify if it exists, is busy,
             // --- or if it's available. In the last case I have to mark it as  busy and
-            // --- send back, togheder with the reply, the file's size and tags.
+            // --- send back, togheder with the reply, the file's size and tags.            
+            Handshake handshake = (Handshake)msg;
             AuthorizationReply reply = fileTable.testAndSet(handshake.getFileName(), handshake.getModifier());
             log.debug("Received Handshake. Sending out AuthReply: {}",reply);
             getSender().tell(reply, getSelf());
         }
         
-        // --- FILE TRANSFER RESULT --- //
+        // ------------------------------ //
+        // ---- FILE TRANSFER RESULT ---- //
+        // ------------------------------ //
         else if (msg instanceof FileTransferResult){
             FileTransferResult fileTransferResult = ((FileTransferResult) msg);
-            String fileName = fileTransferResult.getFileName();
+            String fileName = fileTransferResult.getFileName(); //TODO: serve?
             log.debug("FileTransferResult is: {}", fileTransferResult );
         
-            switch(fileTransferResult.getMessageType()){             
+            switch(fileTransferResult.getMessageType()){                                 
+                case CONNECTION_FAILED:
+                    myGuiActor.tell(msg,getSelf());
+                    break;
+                    
+                case FILE_TO_RECEIVE_BUSY:
+                case FILE_TO_RECEIVE_NOT_EXISTS:
+                case NOT_ENOUGH_SPACE_FOR_RECEIVING:
                 case FILE_RECEIVING_FAILED:
-                    // --- In this case we have to delete the entry for the file, free the
-                    // --- corresponding space and delete the received part of the file  
+                case IO_ERROR_WHILE_RECEIVING:
+                    receiverRollBack(fileTransferResult);
+                    myGuiActor.tell(msg,getSelf());
+                    break;
+                    
+                case FILE_RECEIVED_SCCESSFULLY:
                     if (fileTransferResult.getFileModifier() == EnumFileModifier.WRITE){
-                        log.info("Deleting fileEntry and corresponding corrputed file {}", fileName);
-                        FileElement e = fileTable.deleteEntry(fileName);
-                        if (e == null){
-                            log.info("The rollBack has no effect on {}", fileName);
-                        } else {
-                            myFreeSpace += e.getSize();
-                        }
-                        File corruptedFile = new File(filePath + fileName);
-                        if(corruptedFile.exists() && corruptedFile.canWrite()){
-                            corruptedFile.delete();
-                        }                        
+                        SendFreeSpaceSpread spaceToPublish = new SendFreeSpaceSpread(myFreeSpace);
+                        myClusterListener.tell(spaceToPublish, getSelf());
                     }
                     break;
+                    
+                case FILE_TO_SEND_NOT_EXISTS:
+                case NOT_ENOUGH_SPACE_FOR_SENDING:
+                case IO_ERROR_WHILE_SENDING:
+                case FILE_NO_MORE_BUSY:
+                    senderRollBack(fileTransferResult);
+                    myGuiActor.tell(msg,getSelf());
+                    break;
+                    
+                case FILE_TO_SEND_BUSY:
+                case FILE_SENDING_FAILED:
+                    myGuiActor.tell(msg,getSelf());
+                    break;                    
+                    
+                case FILE_OPENING_FAILED:
+                    File fileToDelete = new File(filePath + fileName);
+                    if(fileToDelete.exists() && fileToDelete.canWrite()){
+                        fileToDelete.delete();
+                        log.debug("I've just deleted the sent file {}", fileName);
+                    } else {
+                        log.warning("File {} deleting failed. File does not exist: {}; File not writable: {}",
+                                fileName, !fileToDelete.exists(), !fileToDelete.canWrite());
+                    }                    
+                    break;  
+                    
                 case FILE_SENT_SUCCESSFULLY:
                     if (fileTransferResult.getFileModifier() == EnumFileModifier.WRITE){
                         FileElement e = fileTable.deleteEntry(fileName);
@@ -191,12 +257,7 @@ public class Server extends UntypedActor {
                             }
                         }
                     }
-                    break;
-                case FILE_NO_MORE_BUSY:
-                    if (fileTransferResult.getFileModifier() == EnumFileModifier.WRITE){
-                        fileTable.freeEntry(fileName);
-                    }
-                    break;
+                    break;                
             }
         }
     }    
