@@ -11,33 +11,30 @@ import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 
 public class FXMLModifyController implements Initializable {
-    
+
     @FXML
     private void done(ActionEvent event) {
-       GUI.getSecondaryStage().close();
-       
-       //the file under modify is: GUI.ModifiedFile.getName();
-       
-       //AllocationRequest to update file's size
-       //the file exits the busy-state
-       AllocationRequest newReq = new AllocationRequest(GUI.ModifiedFile.getName(),0,GUI.ModifiedFile.getTags(),false);
-       
-       //(-- TO DO INTO THE ClusterListener
-       //- load distribution (only destination election) -> (ClusterListener knows membersFreeSpace.getHighestFreeSpaceMember())
-       //- update tags in the fileInfoTabe -> (ClusterListener knows membersMap, for the responsible of each tag)
-       //- send file -> (i must say to the clusterListener to initiate the file transfer)
-       // --)
-       File modifile = new File(GuiActor.getFilePath() + ModifiedFile.getName());
-       GuiActor.getClusterListenerActorRef().tell(
-               new EndModify(ModifiedFile.getName(), ModifiedFile.getTags(),  modifile.length()), 
-               GuiActor.getGuiActorRef());
-       
-       //ERROR: can't show the main stage before the check of the clusterListener
-       GUI.getStage().show();
+        GUI.getSecondaryStage().close();
+        File modifile = new File(GuiActor.getFilePath() + ModifiedFile.getName());
+
+        //the file under modify is: GUI.ModifiedFile.getName();
+        
+        //free busy-ness
+        //but if the file has size zero send directly to EndModify message
+        AllocationRequest newReq = new AllocationRequest(GUI.ModifiedFile.getName(), modifile.length(), GUI.ModifiedFile.getTags(), false);
+        GuiActor.getServer().tell(newReq, GuiActor.getGuiActorRef());
+        
+        if(modifile.length() == 0)
+            GuiActor.getClusterListenerActorRef().tell(
+                new EndModify(ModifiedFile.getName(), ModifiedFile.getTags(), modifile.length()),
+                GuiActor.getGuiActorRef());
+
+        //ERROR: can't show the main stage before the check of the clusterListener
+        GUI.getStage().show();
     }
-    
+
     @Override
     public void initialize(URL url, ResourceBundle rb) {
-        
+
     }
 }

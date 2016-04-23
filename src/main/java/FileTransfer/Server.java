@@ -157,19 +157,29 @@ public class Server extends UntypedActor {
         else if (msg instanceof AllocationRequest){
             //log.debug("An allocationRequest arrived, with ");
             AllocationRequest request = (AllocationRequest)msg;
-            if (myFreeSpace >= request.getSize()){
-                myFreeSpace -= request.getSize();
+            
+            if (request.getSize() == 0){
                 boolean occupied = request.isBusy();
                 FileElement newElement = new FileElement(occupied, request.getSize(),
                         request.getTags());
                 if(fileTable.createOrUpdateEntry(request.getFileName(), newElement)==false){
                     log.error("Someone tried to send me the file {} I already own", request.getFileName());
-                }                
-                getSender().tell(new SimpleAnswer(true), getSelf());
-                log.debug("Received AllocationRequest. Sending out the response: true");
+                }
             } else {
-                getSender().tell(new SimpleAnswer(false), getSelf());
-                log.debug("Received AllocationRequest. Sending out the response: false");
+                if (myFreeSpace >= request.getSize()){
+                    myFreeSpace -= request.getSize();
+                    boolean occupied = request.isBusy();
+                    FileElement newElement = new FileElement(occupied, request.getSize(),
+                            request.getTags());
+                    if(fileTable.createOrUpdateEntry(request.getFileName(), newElement)==false){
+                        log.error("Someone tried to send me the file {} I already own", request.getFileName());
+                    }                
+                    getSender().tell(new SimpleAnswer(true), getSelf());
+                    log.debug("Received AllocationRequest. Sending out the response: true");
+                } else {
+                    getSender().tell(new SimpleAnswer(false), getSelf());
+                    log.debug("Received AllocationRequest. Sending out the response: false");
+                }
             }
         } 
         

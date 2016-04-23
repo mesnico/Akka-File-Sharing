@@ -65,19 +65,19 @@ public class ClusterListenerActor extends UntypedActor {
     private final FileInfoDistributedTable infoTable;
     private final FoundFiles foundFiles;
     private final String localAddress;
-    private ActorSelection guiActor,soulReaper,server;
+    private ActorSelection guiActor, soulReaper, server;
     private ActorRef mediator;
-    
+
     private final int clusterSystemPort;
     private long myFreeSpace = 0;
-    
-    public ClusterListenerActor() throws Exception{
+
+    public ClusterListenerActor() throws Exception {
         this.clusterSystemPort = config.getInt("akka.remote.netty.tcp.port");
-        
+
         //transforms the local reference to remote reference to uniformate hash accesses in case of remote actor
         Address mineAddress = getSelf().path().address();
-        localAddress = Utilities.getAddress(mineAddress,clusterSystemPort);
-        
+        localAddress = Utilities.getAddress(mineAddress, clusterSystemPort);
+
         //construct the members map and member free space map
         membersMap = new HashMembersData();
         membersFreeSpace = new FreeSpaceMembersData();
@@ -87,23 +87,23 @@ public class ClusterListenerActor extends UntypedActor {
 
     //subscribe to cluster changes
     @Override
-    public void preStart() throws Exception{
+    public void preStart() throws Exception {
         //#subscribe
         cluster.subscribe(getSelf(), ClusterEvent.initialStateAsEvents(),
                 MemberEvent.class, UnreachableMember.class);
         //#subscribe
-        
+
         //subscribe to the freeSpaceTopic
         mediator
-            = DistributedPubSub.get(getContext().system()).mediator();
+                = DistributedPubSub.get(getContext().system()).mediator();
         mediator.tell(new DistributedPubSubMediator.Subscribe("freeSpaceTopic", getSelf()),
                 getSelf());
-        
+
         //create the references to the other actors
-        soulReaper = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"+clusterSystemPort+"/user/soulReaper");
-        guiActor   = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"+clusterSystemPort+"/user/gui");
-        server   = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"+clusterSystemPort+"/user/server");
-        
+        soulReaper = getContext().actorSelection("akka.tcp://ClusterSystem@" + AddressResolver.getMyIpAddress() + ":" + clusterSystemPort + "/user/soulReaper");
+        guiActor = getContext().actorSelection("akka.tcp://ClusterSystem@" + AddressResolver.getMyIpAddress() + ":" + clusterSystemPort + "/user/gui");
+        server = getContext().actorSelection("akka.tcp://ClusterSystem@" + AddressResolver.getMyIpAddress() + ":" + clusterSystemPort + "/user/server");
+
         //subscrive to to the soul reaper
         soulReaper.tell(new WatchMe(), getSelf());
     }
@@ -115,30 +115,30 @@ public class ClusterListenerActor extends UntypedActor {
     }
 
     @Override
-    public void onReceive(Object message) throws Exception{
-        if (message instanceof DistributedPubSubMediator.SubscribeAck){
+    public void onReceive(Object message) throws Exception {
+        if (message instanceof DistributedPubSubMediator.SubscribeAck) {
             log.info("Subscribed to freeSpace Topic");
         } else if (message instanceof MemberUp) {
             MemberUp mMemberUp = (MemberUp) message;
-            log.info("{} -->Member is Up: {}", localAddress, Utilities.getAddress(mMemberUp.member().address(),clusterSystemPort));
+            log.info("{} -->Member is Up: {}", localAddress, Utilities.getAddress(mMemberUp.member().address(), clusterSystemPort));
 
             //inserts the new member in the map
-            membersMap.newMember(Utilities.computeId(Utilities.getAddress(mMemberUp.member().address(),clusterSystemPort)), mMemberUp.member());    //IS IT RIGHT?
-            log.info("new Member inserted in membersMap: {}",mMemberUp.member());
-            log.debug("Current membersMap status: {} ",membersMap);
-            
+            membersMap.newMember(Utilities.computeId(Utilities.getAddress(mMemberUp.member().address(), clusterSystemPort)), mMemberUp.member());    //IS IT RIGHT?
+            log.info("new Member inserted in membersMap: {}", mMemberUp.member());
+            log.debug("Current membersMap status: {} ", membersMap);
+
             //transfer control of the right tags to the new node, if it is my predecessor.
             //if it is my predecessor
-            if(Utilities.computeId(Utilities.getAddress(getSelf().path().address(),clusterSystemPort)).compareTo(
-                    membersMap.getSuccessorById(Utilities.computeId(Utilities.getAddress(mMemberUp.member().address(),clusterSystemPort))))==0){
+            if (Utilities.computeId(Utilities.getAddress(getSelf().path().address(), clusterSystemPort)).compareTo(
+                    membersMap.getSuccessorById(Utilities.computeId(Utilities.getAddress(mMemberUp.member().address(), clusterSystemPort)))) == 0) {
                 //collect the infoTable entries to be passed to the arrived node
-                FileInfoTransfer fit = infoTable.buildFileInfoTransfer(membersMap,Utilities.computeId(Utilities.getAddress(getSelf().path().address(),clusterSystemPort))); 
+                FileInfoTransfer fit = infoTable.buildFileInfoTransfer(membersMap, Utilities.computeId(Utilities.getAddress(getSelf().path().address(), clusterSystemPort)));
                 //send the infos to the new responsible
                 getContext().actorSelection(mMemberUp.member().address() + "/user/clusterListener")
                         .tell(fit, getSelf());
-                log.debug("Sending out file info: {}",fit.toString());
+                log.debug("Sending out file info: {}", fit.toString());
             }
-           
+
             //send my free space to the new arrived member
             getContext().actorSelection(mMemberUp.member().address() + "/user/clusterListener")
                     .tell(new FreeSpaceSpread(myFreeSpace), getSelf());
@@ -150,121 +150,114 @@ public class ClusterListenerActor extends UntypedActor {
         } else if (message instanceof MemberRemoved) {
             MemberRemoved mMemberRemoved = (MemberRemoved) message;
             log.info("Member is Removed: {}", mMemberRemoved.member());
-            
-            if(mMemberRemoved.previousStatus()==MemberStatus.down()){
+
+            if (mMemberRemoved.previousStatus() == MemberStatus.down()) {
                 //the member was removed because crashed
             } else {
                 //the member shutted down gracefully
             }
-            
+
             //in any case, the member is removed from the local structure
-            Member removed = membersMap.deleteMemberById(Utilities.computeId(Utilities.getAddress(mMemberRemoved.member().address(),clusterSystemPort)));
-            if(removed == null){
-                log.error("Member {} does not exist in membersMap!!",mMemberRemoved.member());
+            Member removed = membersMap.deleteMemberById(Utilities.computeId(Utilities.getAddress(mMemberRemoved.member().address(), clusterSystemPort)));
+            if (removed == null) {
+                log.error("Member {} does not exist in membersMap!!", mMemberRemoved.member());
             } else {
-                log.info("Member removed in membersMap: {}",mMemberRemoved.member());
-                log.debug("Current membersMap status: {} ",membersMap);
+                log.info("Member removed in membersMap: {}", mMemberRemoved.member());
+                log.debug("Current membersMap status: {} ", membersMap);
             }
-            
+
             //the member is also removed from the free space queue
             //the only way is to search it by member address and to delete it.
-            boolean exists = membersFreeSpace.deleteByMember(Utilities.computeId(Utilities.getAddress(mMemberRemoved.member().address(),clusterSystemPort)));
-            if(!exists){
-                log.error("Member {} does not exist in membersFreeSpace!!",mMemberRemoved.member());
+            boolean exists = membersFreeSpace.deleteByMember(Utilities.computeId(Utilities.getAddress(mMemberRemoved.member().address(), clusterSystemPort)));
+            if (!exists) {
+                log.error("Member {} does not exist in membersFreeSpace!!", mMemberRemoved.member());
             } else {
-                log.info("Member removed in membersFreeSpace: {}",mMemberRemoved.member());
-                log.debug("Current membersFreeSpace status: {} ",membersFreeSpace);
+                log.info("Member removed in membersFreeSpace: {}", mMemberRemoved.member());
+                log.debug("Current membersFreeSpace status: {} ", membersFreeSpace);
             }
-        //message sent when the new member arrives in the cluster. The map has to be immediately filled with the current state
+            //message sent when the new member arrives in the cluster. The map has to be immediately filled with the current state
         } else if (message instanceof CurrentClusterState) {
             CurrentClusterState state = (CurrentClusterState) message;
             for (Member member : state.getMembers()) {
                 if (member.status().equals(MemberStatus.up())) {
-                    membersMap.newMember(Utilities.computeId(member.address().hostPort()),member);
+                    membersMap.newMember(Utilities.computeId(member.address().hostPort()), member);
                 }
             }
-            log.info("membersMap initialized: {}",membersMap);
-        
-        } else if (message instanceof SendFreeSpaceSpread){
-            long freeByteSpace =((SendFreeSpaceSpread) message).getFreeByteSpace();
+            log.info("membersMap initialized: {}", membersMap);
+
+        } else if (message instanceof SendFreeSpaceSpread) {
+            long freeByteSpace = ((SendFreeSpaceSpread) message).getFreeByteSpace();
             // --- keep the freeSpace also in an updated clusterListener variable,
             // --- so that members entering could be immediately notified
             myFreeSpace = freeByteSpace;
             //tell my free space to all the other cluster nodes
             mediator.tell(new DistributedPubSubMediator.Publish("freeSpaceTopic", new FreeSpaceSpread(freeByteSpace)),
-                getSelf());
-            
-        } else if (message instanceof FreeSpaceSpread){
+                    getSelf());
+
+        } else if (message instanceof FreeSpaceSpread) {
             //insert the received information about the free space in the current priority queue.
             FreeSpaceSpread receivedFreeSpace = (FreeSpaceSpread) message;
             System.out.println(getSelf() + " " + getSender());
-            membersFreeSpace.updateMemberFreeSpace(Utilities.computeId(Utilities.getAddress(getSender().path().address(),clusterSystemPort)), receivedFreeSpace.getFreeByteSpace());  //IS IT RIGHT?
-            log.info("Added {} with {} bytes free",Utilities.getAddress(getSender().path().address(),clusterSystemPort),receivedFreeSpace.getFreeByteSpace());
-            log.debug("Free space infos: {}",membersFreeSpace);
+            membersFreeSpace.updateMemberFreeSpace(Utilities.computeId(Utilities.getAddress(getSender().path().address(), clusterSystemPort)), receivedFreeSpace.getFreeByteSpace());  //IS IT RIGHT?
+            log.info("Added {} with {} bytes free", Utilities.getAddress(getSender().path().address(), clusterSystemPort), receivedFreeSpace.getFreeByteSpace());
+            log.debug("Free space infos: {}", membersFreeSpace);
 
         } else if (message instanceof EndModify) {//this message is generated at the end of the modify operation, to begine the load distribution
             EndModify mNewFileCreation = (EndModify) message;
             String fileName = mNewFileCreation.getFileName();
+
+            //the check for size constraints has already be performed by server (AllocationRequest)
             
-            //check for size constraints
-            if(myFreeSpace < mNewFileCreation.getFileByteSize()){
-                //OH NO... the size of the file after the modify is greater then my actual free space size
-                //send a message to GuiActor to act accordingly
-                //(possible actions are: change modifications, discard changes, delete file)
-                //Alessandro says "se ci rimane tempo facciamo l'annullamento delle modifiche, ma per adesso il file si cancella!"
+            //load distribution
+            BigInteger newOwnerId = membersFreeSpace.getHighestFreeSpaceMember();
+            Member newOwner = membersMap.getMemberById(newOwnerId);
+
+            //check if i'm the choosen by the load distribution
+            if (newOwnerId.equals(Utilities.computeId(Utilities.getAddress(getSelf().path().address(), clusterSystemPort)))) {
+                //no transfer is needed
+
+                //Just update tags into infoTable
+                getSelf().tell(new SpreadTags(fileName, mNewFileCreation.getTags(), newOwnerId), getSelf());
+            } else {
+                //file transfer SEND
+                final ActorRef asker = getContext().actorOf(Props
+                        .create(FileTransferActor.class,
+                                InetAddress.getByName(newOwner.address().host().get()),
+                                (int) newOwner.address().port().get(),
+                                new Handshake(EnumBehavior.SEND, fileName)),
+                        "fileTransferSender");
                 
-            }else{ //all rigth... proceed with load distribution
-                //load distribution
-                BigInteger newOwnerId = membersFreeSpace.getHighestFreeSpaceMember();
-                Member newOwner = membersMap.getMemberById(newOwnerId);
-                
-                //check if i'm the choosen by the load distribution
-                if(newOwnerId.equals(Utilities.computeId(Utilities.getAddress(getSelf().path().address(),clusterSystemPort)))){
-                    //no transfer is needed
-                    
-                    //Just update tags into infoTable
-                    getSelf().tell(new SpreadTags(fileName,mNewFileCreation.getTags(),newOwnerId),getSelf());
-                }else{
-                    //file transfer SEND
-                    final ActorRef asker = getContext().actorOf(Props
-                            .create(FileTransferActor.class, 
-                                    InetAddress.getByName(newOwner.address().host().get()), 
-                                    (int) newOwner.address().port().get(), 
-                                    new Handshake(EnumBehavior.SEND,fileName)),
-                            "fileTransferSender");
-                    
-                    //don't need to update tags... this is performed at the end of the file send
-                    //now we have just to create the file into the FileTable of my server
-                }
+                //don't need to update tags... this is performed at the end of the file send
+                //now we have just to create the file into the FileTable of my server
             }
-            
-        } else if (message instanceof SpreadTags){
+
+        } else if (message instanceof SpreadTags) {
             //used from the EndModify and end of file transfer
-            
+
             SpreadTags msg = (SpreadTags) message;
-            for(String tag : msg.getTags()){
+            for (String tag : msg.getTags()) {
                 Member responsible = membersMap.getResponsibleMemberById(Utilities.computeId(tag));
                 getContext().actorSelection(responsible.address() + "/user/clusterListener")
-                    .tell(new UpdateTag(tag,msg.getFileName(),msg.getOwnerId()), getSelf());
+                        .tell(new UpdateTag(tag, msg.getFileName(), msg.getOwnerId()), getSelf());
             }
-            
+
             //Also the file name information has to be stored as like as other tags
             Member responsible = membersMap.getResponsibleMemberById(Utilities.computeId(msg.getFileName()));
             getContext().actorSelection(responsible.address() + "/user/clusterListener")
-                .tell(new UpdateTag(msg.getFileName(),msg.getFileName(),msg.getOwnerId()), getSelf());
-        
-        } else if (message instanceof SendFileRequest){
-            SendFileRequest fileRequest = (SendFileRequest)message;
+                    .tell(new UpdateTag(msg.getFileName(), msg.getFileName(), msg.getOwnerId()), getSelf());
+
+        } else if (message instanceof SendFileRequest) {
+            SendFileRequest fileRequest = (SendFileRequest) message;
             Member fileOwner = membersMap.getMemberById(fileRequest.getOwnerId());
 
             //check if the owner is myself
-            if (Utilities.computeId(Utilities.getAddress(fileOwner.address(),clusterSystemPort))
+            if (Utilities.computeId(Utilities.getAddress(fileOwner.address(), clusterSystemPort))
                     .equals(Utilities.computeId(Utilities.getAddress(getSelf().path().address(), clusterSystemPort)))) {
                 //no transfer is needed
 
-                log.info("Not needed to transfer the file {} from remote: the owner is myself!",fileRequest.getFileName());
-                
-                FileTransferResult result= new FileTransferResult(EnumEnding.FILE_RECEIVED_SUCCESSFULLY,
+                log.info("Not needed to transfer the file {} from remote: the owner is myself!", fileRequest.getFileName());
+
+                FileTransferResult result = new FileTransferResult(EnumEnding.FILE_RECEIVED_SUCCESSFULLY,
                         fileRequest.getFileName(), fileRequest.getModifier());
                 guiActor.tell(result, getSelf());
             } else {
@@ -277,99 +270,99 @@ public class ClusterListenerActor extends UntypedActor {
                                 new Handshake(EnumBehavior.REQUEST, fileRequest.getFileName(), fileRequest.getModifier())),
                         "fileTransferRequester");
             }
-            
-        } else if (message instanceof SendCreationRequest){
+
+        } else if (message instanceof SendCreationRequest) {
             //I send the creation request (the filename tag) to the responsible member
             //so that it can perform the checks and return me a CreationResponse
             SendCreationRequest cr = (SendCreationRequest) message;
             Member responsibleMember = membersMap.getResponsibleMemberById(
-                Utilities.computeId(cr.getFileName()));
+                    Utilities.computeId(cr.getFileName()));
             getContext().actorSelection(responsibleMember.address() + "/user/clusterListener")
-                .tell(new CreationRequest(cr.getFileName()), getSelf());
-           
-        } else if (message instanceof CreationRequest){
+                    .tell(new CreationRequest(cr.getFileName()), getSelf());
+
+        } else if (message instanceof CreationRequest) {
             //i am the responsible for the new filename tag. I have to add it to my FileInfoDistributedTable, only if it does not exist yet.
-            String fileName = ((CreationRequest)message).getFileName();
-            boolean success = infoTable.testAndSet(fileName, fileName, Utilities.computeId(Utilities.getAddress(getSender().path().address(),clusterSystemPort)));
+            String fileName = ((CreationRequest) message).getFileName();
+            boolean success = infoTable.testAndSet(fileName, fileName, Utilities.computeId(Utilities.getAddress(getSender().path().address(), clusterSystemPort)));
             getSender().tell(new CreationResponse(success), getSelf());
-            
-            log.debug("Received a creation request. \n Success:{}\nCurrent info table is: {}",success,infoTable.toString());
-            log.debug("tag id: {}",Utilities.computeId(fileName));
-            
-        } else if (message instanceof CreationResponse){
+
+            log.debug("Received a creation request. \n Success:{}\nCurrent info table is: {}", success, infoTable.toString());
+            log.debug("tag id: {}", Utilities.computeId(fileName));
+
+        } else if (message instanceof CreationResponse) {
             //forward the response to the GUI actor
-            guiActor.tell((CreationResponse)message, getSelf());
-            
-        } else if (message instanceof SearchRequest){
+            guiActor.tell((CreationResponse) message, getSelf());
+
+        } else if (message instanceof SearchRequest) {
             //reset the found file structure for the new search
             foundFiles.reset();
-            
-            SearchRequest sr = (SearchRequest)message;
+
+            SearchRequest sr = (SearchRequest) message;
             Member responsibleMember;
             //foreach tag (tags + filename) I send the request for the search
-            for(String tag : sr.getSearchString().split(" ")){
+            for (String tag : sr.getSearchString().split(" ")) {
                 responsibleMember = membersMap.getResponsibleMemberById(
-                    Utilities.computeId(tag));
+                        Utilities.computeId(tag));
                 getContext().actorSelection(responsibleMember.address() + "/user/clusterListener")
-                    .tell(new TagSearchRequest(tag), getSelf());
-                System.out.println("sent tag for "+tag);
+                        .tell(new TagSearchRequest(tag), getSelf());
+                System.out.println("sent tag for " + tag);
             }
-            
-        } else if (message instanceof TagSearchRequest){
-            TagSearchRequest tsr = (TagSearchRequest)message;
+
+        } else if (message instanceof TagSearchRequest) {
+            TagSearchRequest tsr = (TagSearchRequest) message;
             //lookup and retrieve the requested file info
             //then send it to the sender
             List<FileInfoElement> requested = infoTable.getByTag(tsr.getTag());
-            
+
             //if the tag exists on this node, it is sent; otherwise the search query is ignored
-            if(requested!=null){
+            if (requested != null) {
                 getSender().tell(new TagSearchResponse(requested), getSelf());
             }
-            
-        } else if (message instanceof TagSearchResponse){
+
+        } else if (message instanceof TagSearchResponse) {
             List<FileInfoElement> receivedFileInfo = ((TagSearchResponse) message).getReturnedList();
             //aggiungo tutti gli elementi 
             foundFiles.addAll(receivedFileInfo);
-            
+
             //tell the GUI actor the calculated response list
             guiActor.tell(foundFiles.createGuiResponse(), getSelf());
-            
+
         } else if (message instanceof UpdateTag) {
             //Receved a information for wich I'm the responsible
             UpdateTag mAddTag = (UpdateTag) message;
             infoTable.updateTag(mAddTag.getFileName(), mAddTag.getTag(), mAddTag.getOwnerId());
-            log.info("Received tag: {}",mAddTag.toString());
-            log.debug("Current File Info Table: {}",infoTable.toString());
-        
+            log.info("Received tag: {}", mAddTag.toString());
+            log.debug("Current File Info Table: {}", infoTable.toString());
+
         } else if (message instanceof FileInfoTransfer) {
-            FileInfoTransfer infos = (FileInfoTransfer)message;
-            
+            FileInfoTransfer infos = (FileInfoTransfer) message;
+
             //merge the arrived file informations into the local structure
             infoTable.mergeInfos(infos);
-            log.info("Received File Infos: {}",infos.toString());
-            log.debug("Current File Info Table: {}",infoTable.toString());
-            
+            log.info("Received File Infos: {}", infos.toString());
+            log.debug("Current File Info Table: {}", infoTable.toString());
+
         } else if (message instanceof InitiateShutdown) {
             log.info("The system is going to shutdown!");
             //transfer all my infos to my successor node
             Member newInfoResponsable = membersMap.getSuccessorMemberById(
-                    Utilities.computeId(Utilities.getAddress(getSelf().path().address(),clusterSystemPort)));
+                    Utilities.computeId(Utilities.getAddress(getSelf().path().address(), clusterSystemPort)));
             //prepare the fileinfo transfer message
             FileInfoTransfer fit = infoTable.buildFileInfoTransfer(membersMap,
-                    Utilities.computeId(Utilities.getAddress(newInfoResponsable.address(),clusterSystemPort)));
+                    Utilities.computeId(Utilities.getAddress(newInfoResponsable.address(), clusterSystemPort)));
             //send the infos to the new responsible
             getContext().actorSelection(newInfoResponsable.address() + "/user/clusterListener")
                     .tell(fit, getSelf());
-            
+
             getSelf().tell(new Shutdown(), getSelf());
-        
-        } else if (message instanceof Shutdown){
+
+        } else if (message instanceof Shutdown) {
             // --- Leave the cluster and stop the system. Then stop all needed actors, myself too
             cluster.leave(cluster.selfAddress());
-            
+
             server.tell(PoisonPill.getInstance(), getSelf());
             getSelf().tell(PoisonPill.getInstance(), getSelf());
-            
+
         } else if (message instanceof MemberEvent) {
             // ignore
 
