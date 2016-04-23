@@ -226,7 +226,7 @@ public class Server extends UntypedActor {
                         SpreadTags tagsMessage = new SpreadTags(fileName, 
                                 fileTable.getFileElement(fileName).getTags(), 
                                 Utilities.computeId(Utilities.getAddress(getSelf().path().address(), localClusterSystemPort)));
-                        myClusterListener.tell(tagsMessage, null);
+                        myClusterListener.tell(tagsMessage, getSelf());
                     }
                     myGuiActor.tell(msg,getSelf());
                     break;

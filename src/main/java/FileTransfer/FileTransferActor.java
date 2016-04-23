@@ -17,6 +17,7 @@ import FileTransfer.messages.EnumFileModifier;
 import FileTransfer.messages.Hello;
 import FileTransfer.messages.SimpleAnswer;
 import Startup.AddressResolver;
+import Startup.WatchMe;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
 import akka.actor.PoisonPill;
@@ -51,6 +52,7 @@ public class FileTransferActor extends UntypedActor {
     private ActorSelection myServer;
     private ActorSelection remoteServer;
     private ActorSelection myGuiActor;
+    private ActorSelection soulReaper;
     private ActorRef interlocutor;
     private ActorRef connectionHandler;
     private Handshake handshake;
@@ -126,12 +128,15 @@ public class FileTransferActor extends UntypedActor {
     public void preStart() throws Exception {
         myServer = getContext().actorSelection("akka.tcp://ClusterSystem@" + AddressResolver.getMyIpAddress() + ":"
                 + localClusterSystemPort + "/user/server");
+        soulReaper = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"
+                +localClusterSystemPort+"/user/soulReaper");
         // TODO: check if this reference is needed by both behavior
         myClusterListener = getContext().actorSelection("akka.tcp://ClusterSystem@" + AddressResolver.getMyIpAddress() + ":"
                 + localClusterSystemPort + "/user/clusterListener");
         myGuiActor = getContext().actorSelection("akka.tcp://ClusterSystem@" + AddressResolver.getMyIpAddress() + ":"
                 + localClusterSystemPort + "/user/gui");
         log.debug("My server's name is {} ", myServer);
+        soulReaper.tell(new WatchMe(), getSelf());
 
         switch (handshake.getBehavior()) {
             case SEND:
@@ -226,7 +231,6 @@ public class FileTransferActor extends UntypedActor {
             // --- In the meanwhile, I'll unwatch che interlocutor, because I'm no more interested
             // --- in knowing his failures, and finally I suicide myself
             public void terminate(EnumEnding msg) {
-                log.info("The protocol ended earlier then expected. Performing rollBack");
                 result = new FileTransferResult(
                         msg, handshake.getFileName(), handshake.getModifier());
                 myServer.tell(result, getSelf());
@@ -400,6 +404,7 @@ public class FileTransferActor extends UntypedActor {
                             if (handshake.getModifier() == EnumFileModifier.WRITE) {
                                 File newFile = new File(filePath + handshake.getFileName());
                                 if (!newFile.exists()) {
+                                     System.out.println("was here!!");
                                     output = new FileOutputStream(filePath + handshake.getFileName()); //TODO: non dovrebbe sollevare eccezioni, vedi documentazione  
                                 } else if (newFile.canWrite()) {
                                     newFile.delete();
@@ -460,6 +465,7 @@ public class FileTransferActor extends UntypedActor {
                 } else if (msg instanceof Received) {
                     ByteBuffer buffer = ((Received) msg).data().toByteBuffer();
                     try {
+                         System.out.println("Written!!");
                         output.write(buffer.array());
                     } catch (Exception e) {
                         result = new FileTransferResult(EnumEnding.IO_ERROR_WHILE_RECEIVING);

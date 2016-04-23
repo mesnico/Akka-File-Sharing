@@ -16,7 +16,7 @@ public class FXMLModifyController implements Initializable {
     private void done(ActionEvent event) {
         GUI.getSecondaryStage().close();
         File modifile = new File(GuiActor.getFilePath() + ModifiedFile.getName());
-
+        
         //the file under modify is: GUI.ModifiedFile.getName();
         
         //free busy-ness
