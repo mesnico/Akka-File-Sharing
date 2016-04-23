@@ -5,7 +5,7 @@
  */
 package GUI.messages;
 
-import FileTransfer.FileModifier;
+import FileTransfer.messages.EnumFileModifier;
 import java.io.Serializable;
 
 /**
@@ -15,9 +15,9 @@ import java.io.Serializable;
 public class SendModifyRequest implements Serializable{
     String fileName;
     String owner;
-    FileModifier mode;
+    EnumFileModifier mode;
 
-    public SendModifyRequest(String fileName, String owner, FileModifier mode) {
+    public SendModifyRequest(String fileName, String owner, EnumFileModifier mode) {
         this.fileName = fileName;
         this.owner = owner;
         this.mode = mode;

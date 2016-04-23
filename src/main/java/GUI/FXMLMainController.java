@@ -1,6 +1,8 @@
 package GUI;
 
+import FileTransfer.messages.EnumFileModifier;
 import GUI.messages.SearchRequest;
+import GUI.messages.SendFileRequest;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.ResourceBundle;
@@ -35,7 +37,7 @@ public class FXMLMainController implements Initializable {
         FileEntry row = table.getSelectionModel().getSelectedItem();
         if(row != null){
             System.out.println(row);
-            //GuiActor.getClusterListenerActorRef().tell(new SendModifyRequest(row.getName(), row.getOwner(), FileModifier.WRITE), GuiActor.getGuiActorRef());
+            GuiActor.getClusterListenerActorRef().tell(new SendFileRequest(row.getFileName(), row.getOwner(), EnumFileModifier.WRITE), GuiActor.getGuiActorRef());
             
             //this has to be done in another message...
             //createStage("Modify",true);

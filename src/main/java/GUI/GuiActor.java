@@ -8,6 +8,8 @@ package GUI;
 import ClusterListenerActor.messages.CreationResponse;
 import ClusterListenerActor.messages.TagSearchGuiResponse;
 import FileTransfer.messages.AllocationRequest;
+import FileTransfer.messages.EnumFileModifier;
+import FileTransfer.messages.FileTransferResult;
 import Startup.AddressResolver;
 import Startup.WatchMe;
 import akka.actor.ActorRef;
@@ -39,10 +41,12 @@ public class GuiActor extends UntypedActor{
     private static ActorRef guiActorRef;
     private static ActorSelection clusterListenerActorRef,soulReaper,server;
     private final int clusterSystemPort;
+    private final String tmpFilePath;
     
     public GuiActor(){
         clusterSystemPort = config.getInt("akka.remote.netty.tcp.port");
         filePath = config.getString("app-settings.file-path");
+        tmpFilePath = System.getProperty("java.io.tmpdir");
     }
     
     public static String getFilePath(){
@@ -113,6 +117,65 @@ public class GuiActor extends UntypedActor{
             log.info("Received search infos (ObservableList<FileEntry>): {}",tags);
             FXMLMainController.getTable().setItems(tags);
             FXMLMainController.getTable().sort();
+            
+        } else if (message instanceof FileTransferResult){
+            FileTransferResult ftr = (FileTransferResult) message;
+            log.info("FileTransferResult: {}",ftr);
+            
+            if(GUI.getStage().isShowing()){
+                
+                switch(ftr.getMessageType()){
+                    case FILE_RECEIVED_SUCCESSFULLY:
+                        boolean isWrite = (ftr.getFileModifier() == EnumFileModifier.WRITE);
+                        String path = (isWrite)? filePath : tmpFilePath;
+                        File file = new File(path + ftr.getFileName());
+                        file.setWritable(true);
+                        
+                        if(isWrite){
+                            //tags are in fileTable
+                            
+                            Desktop.getDesktop().edit(file);
+                            try {
+                                FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/fxml/Modify.fxml"));
+                                Parent root = (Parent) fxmlLoader.load();
+                                Stage stage = new Stage();
+                                stage.setScene(new Scene(root));
+                                stage.setTitle("Modify");
+                                //remove "minimize" and "restore down" buttons
+                                stage.initStyle(StageStyle.UTILITY);
+                                //disable close button
+                                stage.setOnCloseRequest((final WindowEvent windowEvent) -> { windowEvent.consume(); });
+
+                                GUI.setSecondaryStage(stage);
+                                GUI.getSecondaryStage().show();
+                                GUI.getStage().hide();
+
+                            } catch(Exception ex) {
+                                System.out.println(ex.getMessage());
+                                System.out.println(ex.getCause().toString());
+                            }
+                        }else{
+                            Desktop.getDesktop().open(file);
+                            GUI.getStage().show();
+                        }
+                        
+                        break;
+                        
+                    case FILE_RECEIVING_FAILED:
+                        Alert alert = new Alert(Alert.AlertType.ERROR);
+                        alert.setTitle("Error");
+                        alert.setHeaderText("Reciving Failed");
+                        alert.setContentText("An error occurred during file transfer!");
+
+                        alert.showAndWait();
+                        GUI.getStage().show();
+                        break;
+                    
+                    //following case handles progress bars during load balancing...
+                    //case FILE_SENT_SUCCESSFULLY:
+                }
+                
+            }
         }
         
         /*

@@ -218,6 +218,7 @@ public class Server extends UntypedActor {
                                 Utilities.computeId(Utilities.getAddress(getSelf().path().address(), localClusterSystemPort)));
                         myClusterListener.tell(tagsMessage, null);
                     }
+                    myGuiActor.tell(msg,getSelf());
                     break;
                     
                 case FILE_TO_SEND_NOT_EXISTS:
