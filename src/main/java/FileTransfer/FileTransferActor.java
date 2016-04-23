@@ -378,6 +378,12 @@ public class FileTransferActor extends UntypedActor {
                                 AllocationRequest request = new AllocationRequest(
                                         handshake.getFileName(), size, reply.getTags(), false);
                                 myServer.tell(request, getSelf());
+                                // --- if size is 0 I need also to send immediately a response to the interlocutor
+                                // --- the response is for sure positive
+                                if(size==0){
+                                    SimpleAnswer answer = new SimpleAnswer(true);
+                                    getSelf().tell(answer, getSelf());
+                                }
                             } else {
                                 // --- READ request: I will give the permission without asking the server --- //
                                 SimpleAnswer answer = new SimpleAnswer(true);
@@ -393,79 +399,51 @@ public class FileTransferActor extends UntypedActor {
                     // --- If the response is negative, the protocol ends here. I must communicate
                     // --- this also to my interlocutor 
                     SimpleAnswer answer = (SimpleAnswer) msg;
+                    String path = (handshake.getModifier() == EnumFileModifier.WRITE) ? filePath : tmpFilePath;
                     if (size != 0){
-                        if (answer.getAnswer() == false) {
-                        answer = new SimpleAnswer(false);
                         interlocutor.tell(answer, getSelf());
-                        terminate(EnumEnding.NOT_ENOUGH_SPACE_FOR_RECEIVING);
-                        log.info("Not enough space for receiving file {}", handshake.getFileName());
+                        if (answer.getAnswer() == false) {
+                            //answer = new SimpleAnswer(false);
+                            terminate(EnumEnding.NOT_ENOUGH_SPACE_FOR_RECEIVING);
+                            log.info("Not enough space for receiving file {}", handshake.getFileName());
                         } else {
                             // --- The permission was granted. The connection will be closed at the end
-                            if (handshake.getModifier() == EnumFileModifier.WRITE) {
-                                File newFile = new File(filePath + handshake.getFileName());
-                                if (!newFile.exists()) {
-                                     System.out.println("was here!!");
-                                    output = new FileOutputStream(filePath + handshake.getFileName()); //TODO: non dovrebbe sollevare eccezioni, vedi documentazione  
-                                } else if (newFile.canWrite()) {
-                                    newFile.delete();
-                                    output = new FileOutputStream(filePath + handshake.getFileName()); //TODO: non dovrebbe sollevare eccezioni, vedi documentazione  
-                                    log.warning("The file {} was already existing, so I've overridden it", handshake.getFileName());
-                                } else {
-                                    log.warning("The file {} already exists, and I was not able to override it", handshake.getFileName());
-                                    }
+
+                            File newFile = new File(path + handshake.getFileName());
+                            if (!newFile.exists()) {
+                                output = new FileOutputStream(path + handshake.getFileName()); //TODO: non dovrebbe sollevare eccezioni, vedi documentazione  
+                            } else if (newFile.canWrite()) {
+                                newFile.delete();
+                                output = new FileOutputStream(path + handshake.getFileName()); //TODO: non dovrebbe sollevare eccezioni, vedi documentazione  
+                                log.warning("The file {} was already existing, so I've overridden it", handshake.getFileName());
                             } else {
-                                // --- It was a READ request
-                                File newFile = new File(tmpFilePath + handshake.getFileName());
-                                if (!newFile.exists()) {
-                                    output = new FileOutputStream(tmpFilePath + handshake.getFileName()); //TODO: non dovrebbe sollevare eccezioni, vedi documentazione  
-                                } else if (newFile.canWrite()) {
-                                    newFile.delete();
-                                    output = new FileOutputStream(tmpFilePath + handshake.getFileName()); //TODO: non dovrebbe sollevare eccezioni, vedi documentazione  
-                                    log.warning("The file {} was already existing, so I've overridden it", handshake.getFileName());
-                                } else {
-                                    log.warning("The file {} already exists, and I was not able to override it", handshake.getFileName());
-                                    }      
+                                log.warning("The file {} already exists, and I was not able to override it", handshake.getFileName());
                             }
-                            connectionHandler.tell(TcpMessage.close(), getSender());                                
+                            //connectionHandler.tell(TcpMessage.close(), getSender());                                
                         }   
                     } else {
                         // --- Size is 0
-                        if (handshake.getModifier() == EnumFileModifier.WRITE) {
-                            // --- special case: create the file and end the protocol.
-                            // --- In the close() handling, the guiActor
-                            // --- will be informed of the success.
-                            // --- If the file already exists, we override it (but this should not happen)
-                            File newFile = new File(filePath + handshake.getFileName());
-                            if (!newFile.exists()) {
-                                newFile.createNewFile(); //TODO: maybe in this case a close is in order? (the sender doesn't perform this step)
-                                log.info("New file {} has been created", handshake.getFileName());
-                            } else if (newFile.canWrite()) {
-                                    newFile.delete();
-                                    newFile.createNewFile();
-                                    log.warning("The file {} was already existing, so I've overridden it", handshake.getFileName());
-                            } else {
-                                    log.warning("The file {} already exists, and I was not able to override it", handshake.getFileName());
-                            }
+                        
+                        // --- special case: create the file and end the protocol.
+                        // --- In the close() handling, the guiActor
+                        // --- will be informed of the success.
+                        // --- If the file already exists, we override it (but this should not happen)
+                        File newFile = new File(path + handshake.getFileName());
+                        if (!newFile.exists()) {
+                            newFile.createNewFile(); //TODO: maybe in this case a close is in order? (the sender doesn't perform this step)
+                            log.info("New file {} has been created", handshake.getFileName());
+                        } else if (newFile.canWrite()) {
+                                newFile.delete();
+                                newFile.createNewFile();
+                                log.warning("The file {} was already existing, so I've overridden it", handshake.getFileName());
                         } else {
-                            // --- It was a READ request
-                            File newFile = new File(filePath + handshake.getFileName());
-                            if (!newFile.exists()) {
-                                newFile.createNewFile(); //TODO: maybe in this case a close is in order? (the sender doesn't perform this step)
-                                log.info("New file {} has been created", handshake.getFileName());
-                            } else if (newFile.canWrite()) {
-                                    newFile.delete();
-                                    newFile.createNewFile();
-                                    log.warning("The file {} was already existing, so I've overridden it", handshake.getFileName());
-                            } else {
-                                    log.warning("The file {} already exists, and I was not able to override it", handshake.getFileName());
-                            }                            
+                                log.warning("The file {} already exists, and I was not able to override it", handshake.getFileName());
                         }
-                        connectionHandler.tell(TcpMessage.close(), getSender()); //magari dovremmo gesrtire il fatto che, se la dimensione era 0, non aggiorniamo lo spazio nella fileTable                            
+                        connectionHandler.tell(TcpMessage.close(), getSelf()); //magari dovremmo gesrtire il fatto che, se la dimensione era 0, non aggiorniamo lo spazio nella fileTable                            
                     }
                 } else if (msg instanceof Received) {
                     ByteBuffer buffer = ((Received) msg).data().toByteBuffer();
                     try {
-                         System.out.println("Written!!");
                         output.write(buffer.array());
                     } catch (Exception e) {
                         result = new FileTransferResult(EnumEnding.IO_ERROR_WHILE_RECEIVING);
@@ -474,7 +452,8 @@ public class FileTransferActor extends UntypedActor {
                         log.error("Error in receiving file {}: there is not enough space on my hard disk", handshake.getFileName());
                     }
                 } else if (msg instanceof Terminated) {
-                    output.close();
+                    if(output!=null) 
+                        output.close();
                     terminate(EnumEnding.FILE_RECEIVING_FAILED);
                     log.error("The remote peer is falled, so I was unable to receive file {}. I will perform a roll back.", handshake.getFileName());
                 } else if (msg instanceof CommandFailed) {
@@ -483,7 +462,8 @@ public class FileTransferActor extends UntypedActor {
                     log.error("the OS kernel socket buffer was full");
                 } else if (msg instanceof ConnectionClosed) {
                     ConnectionClosed connection = (ConnectionClosed) msg;
-                    output.close(); //TODO: Throws IOException if an I/O error occurs. In case of exception, rollBack etc.
+                    if(output!=null)
+                        output.close(); //TODO: Throws IOException if an I/O error occurs. In case of exception, rollBack etc.
                     log.info("connectionClosed received, with errorCause {}", connection.getErrorCause());
                     if (connection.isErrorClosed()) {
                         terminate(EnumEnding.FILE_RECEIVING_FAILED);
