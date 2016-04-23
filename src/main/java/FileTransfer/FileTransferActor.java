@@ -508,7 +508,7 @@ public class FileTransferActor extends UntypedActor {
                         log.info("There was an error during the TcpConnection, so receiving of file {} has failed", handshake.getFileName());
                     } else {
                         // --- all went the right direction: communicate to the clusterListener...
-                        terminate(EnumEnding.FILE_RECEIVED_SCCESSFULLY);
+                        terminate(EnumEnding.FILE_RECEIVED_SUCCESSFULLY);
                     }
                 }
             }

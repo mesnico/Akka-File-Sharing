@@ -45,7 +45,7 @@ public class FoundFiles {
             response.addEntry(new FileEntry(
                     entry.getValue().intValue(),
                     entry.getKey().getFileName(),
-                    entry.getKey().getOwnerId().toString()));
+                    entry.getKey().getOwnerId()));
         }
         
         //and return the prepared response

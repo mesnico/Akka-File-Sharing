@@ -3,40 +3,36 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package ClusterListenerActor.messages;
+package GUI.messages;
 
+import FileTransfer.messages.EnumFileModifier;
 import java.io.Serializable;
 import java.math.BigInteger;
 
 /**
  *
- * @author francescop
+ * @author nicky
  */
-public class UpdateTag  implements Serializable{
-    String fileName;
-    String tag;
-    BigInteger ownerId;
+public class SendFileRequest implements Serializable{
+    private String fileName;
+    private BigInteger ownerId;
+    private EnumFileModifier modifier;
 
-    public UpdateTag(String fileName, String tag, BigInteger ownerId) {
+    public SendFileRequest(String fileName, BigInteger ownerId, EnumFileModifier modifier) {
         this.fileName = fileName;
-        this.tag = tag;
         this.ownerId = ownerId;
+        this.modifier = modifier;
     }
 
     public String getFileName() {
         return fileName;
     }
 
-    public String getTag() {
-        return tag;
-    }
-
     public BigInteger getOwnerId() {
         return ownerId;
     }
-    
-    @Override
-    public String toString(){
-        return "fileName: "+fileName+"; tag: "+tag+"; ownerId: "+ownerId;
+
+    public EnumFileModifier getModifier() {
+        return modifier;
     }
 }

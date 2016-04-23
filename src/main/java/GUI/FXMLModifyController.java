@@ -32,8 +32,8 @@ public class FXMLModifyController implements Initializable {
                new EndModify(ModifiedFile.getName(), ModifiedFile.getTags(),  modifile.length()), 
                GuiActor.getGuiActorRef());
        
-       //can't show the main stage before the check of the clusterListener
-       //GUI.getStage().show();
+       //ERROR: can't show the main stage before the check of the clusterListener
+       GUI.getStage().show();
     }
     
     @Override

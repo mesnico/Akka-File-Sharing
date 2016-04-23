@@ -13,11 +13,13 @@ import ClusterListenerActor.messages.TagSearchRequest;
 import ClusterListenerActor.messages.TagSearchResponse;
 import FileTransfer.FileTransferActor;
 import FileTransfer.messages.EnumBehavior;
-import FileTransfer.messages.EnumFileModifier;
+import FileTransfer.messages.EnumEnding;
+import FileTransfer.messages.FileTransferResult;
 import FileTransfer.messages.Handshake;
 import FileTransfer.messages.SendFreeSpaceSpread;
 import GUI.messages.SearchRequest;
 import GUI.messages.SendCreationRequest;
+import GUI.messages.SendFileRequest;
 import Startup.AddressResolver;
 import Startup.WatchMe;
 import akka.actor.ActorRef;
@@ -42,8 +44,6 @@ import akka.event.LoggingAdapter;
 import com.typesafe.config.Config;
 import java.math.BigInteger;
 import java.net.InetAddress;
-import java.net.SocketException;
-import java.net.UnknownHostException;
 import java.util.List;
 
 /*
@@ -219,7 +219,7 @@ public class ClusterListenerActor extends UntypedActor {
                 Member newOwner = membersMap.getMemberById(newOwnerId);
                 
                 //check if i'm the choosen by the load distribution
-                if(newOwnerId == Utilities.computeId(Utilities.getAddress(getSelf().path().address(),clusterSystemPort))){
+                if(newOwnerId.equals(Utilities.computeId(Utilities.getAddress(getSelf().path().address(),clusterSystemPort)))){
                     //no transfer is needed
                     
                     //Just update tags into infoTable
@@ -232,8 +232,6 @@ public class ClusterListenerActor extends UntypedActor {
                                     (int) newOwner.address().port().get(), 
                                     new Handshake(EnumBehavior.SEND,fileName)),
                             "fileTransferSender");
-                    getContext().actorSelection(newOwner + "/user/clusterListener")
-                            .tell( null ,getSelf());
                     
                     //don't need to update tags... this is performed at the end of the file send
                     //now we have just to create the file into the FileTable of my server
@@ -254,7 +252,29 @@ public class ClusterListenerActor extends UntypedActor {
             Member responsible = membersMap.getResponsibleMemberById(Utilities.computeId(msg.getFileName()));
             getContext().actorSelection(responsible.address() + "/user/clusterListener")
                 .tell(new UpdateTag(msg.getFileName(),msg.getFileName(),msg.getOwnerId()), getSelf());
-                    
+        
+        } else if (message instanceof SendFileRequest){
+            SendFileRequest fileRequest = (SendFileRequest)message;
+            Member fileOwner = membersMap.getMemberById(fileRequest.getOwnerId());
+
+            //check if the owner is myself
+            if (fileOwner.equals(Utilities.computeId(Utilities.getAddress(getSelf().path().address(), clusterSystemPort)))) {
+                //no transfer is needed
+
+                log.info("Not needed to transfer the file {} from remote: the owner is myself!",fileRequest.getFileName());
+                
+                FileTransferResult result= new FileTransferResult(EnumEnding.FILE_RECEIVED_SUCCESSFULLY,
+                        fileRequest.getFileName(), fileRequest.getModifier());
+                guiActor.tell(result, getSelf());
+            } else {
+                //file transfer REQUEST
+                final ActorRef asker = getContext().actorOf(Props
+                        .create(FileTransferActor.class,
+                                InetAddress.getByName(fileOwner.address().host().get()),
+                                (int) fileOwner.address().port().get(),
+                                new Handshake(EnumBehavior.REQUEST, fileRequest.getFileName(), fileRequest.getModifier())),
+                        "fileTransferRequester");
+            }
             
         } else if (message instanceof SendCreationRequest){
             //I send the creation request (the filename tag) to the responsible member
@@ -315,7 +335,9 @@ public class ClusterListenerActor extends UntypedActor {
         } else if (message instanceof UpdateTag) {
             //Receved a information for wich I'm the responsible
             UpdateTag mAddTag = (UpdateTag) message;
-            infoTable.updateTag(mAddTag.getTag(), mAddTag.getFileName(), mAddTag.getOwnerId());
+            infoTable.updateTag(mAddTag.getFileName(), mAddTag.getTag(), mAddTag.getOwnerId());
+            log.info("Received tag: {}",mAddTag.toString());
+            log.debug("Current File Info Table: {}",infoTable.toString());
         
         } else if (message instanceof FileInfoTransfer) {
             FileInfoTransfer infos = (FileInfoTransfer)message;
