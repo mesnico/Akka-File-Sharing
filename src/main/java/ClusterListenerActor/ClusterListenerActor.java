@@ -258,7 +258,8 @@ public class ClusterListenerActor extends UntypedActor {
             Member fileOwner = membersMap.getMemberById(fileRequest.getOwnerId());
 
             //check if the owner is myself
-            if (fileOwner.equals(Utilities.computeId(Utilities.getAddress(getSelf().path().address(), clusterSystemPort)))) {
+            if (Utilities.computeId(Utilities.getAddress(fileOwner.address(),clusterSystemPort))
+                    .equals(Utilities.computeId(Utilities.getAddress(getSelf().path().address(), clusterSystemPort)))) {
                 //no transfer is needed
 
                 log.info("Not needed to transfer the file {} from remote: the owner is myself!",fileRequest.getFileName());
@@ -267,6 +268,7 @@ public class ClusterListenerActor extends UntypedActor {
                         fileRequest.getFileName(), fileRequest.getModifier());
                 guiActor.tell(result, getSelf());
             } else {
+                log.info("Starting remote transfering for the file {}", fileRequest.getFileName());
                 //file transfer REQUEST
                 final ActorRef asker = getContext().actorOf(Props
                         .create(FileTransferActor.class,
