@@ -148,7 +148,7 @@ public class FileTransferActor extends UntypedActor {
                 // --- I am the responder, I was spawned by my server for handling an
                 // --- incoming connection. I'll ack the asker peer just to let him know my address
                 ActorSelection interlocutorSelection = getContext().actorSelection("akka.tcp://ClusterSystem@" + interlocutorIp.getHostAddress() + ":"
-                        + remoteClusterSystemPort + "/user/fileTransferSender");
+                        + remoteClusterSystemPort + "/user/clusterListener/fileTransferSender");
                 FiniteDuration timeout = new FiniteDuration(10, SECONDS);
 
                 interlocutor = Await.result(interlocutorSelection.resolveOne(timeout), timeout);
