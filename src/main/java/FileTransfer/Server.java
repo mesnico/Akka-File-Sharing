@@ -208,7 +208,7 @@ public class Server extends UntypedActor {
                     myGuiActor.tell(msg,getSelf());
                     break;
                     
-                case FILE_RECEIVED_SCCESSFULLY:
+                case FILE_RECEIVED_SUCCESSFULLY:
                     if (fileTransferResult.getFileModifier() == EnumFileModifier.WRITE){
                         SendFreeSpaceSpread spaceToPublish = new SendFreeSpaceSpread(myFreeSpace);
                         myClusterListener.tell(spaceToPublish, getSelf());
