@@ -101,9 +101,6 @@ public class GuiActor extends UntypedActor {
                 //from a request of creation I obtained positive response => Start che creation and modify of the new file
                 GUI.getSecondaryStage().close();
 
-                //tell to the server to create a new entry for the FileTable
-                AllocationRequest newReq = new AllocationRequest(GUI.ModifiedFile.getName(), 0, GUI.ModifiedFile.getTags(), true);
-                server.tell(newReq, getSelf());
                 File file = new File(filePath + GUI.ModifiedFile.getName());
                 if(file.exists()){
                     
@@ -111,8 +108,21 @@ public class GuiActor extends UntypedActor {
                     file.createNewFile();
                 }
                 file.setWritable(true);
+                
+                //if the file is empty, then it is opened for modify. Otherwise, it is directly put in the cluster
+                //this semplifies the case when we need to import an external file
+                boolean needToEdit = (file.length()>0) ? false : true;
+                
+                //tell to the server to create a new entry for the FileTable
+                //if the file was created and not imported, then the size is 0 and there will be no answer from the server.
+                AllocationRequest newReq = new AllocationRequest(GUI.ModifiedFile.getName(), file.length(), 
+                        GUI.ModifiedFile.getTags(), needToEdit);
+                server.tell(newReq, getSelf());
 
-                startModify(file);
+                //the modify is needed only if the file was empty
+                if(needToEdit){
+                    startModify(file);
+                }
             } else {
                 Alert alert = new Alert(Alert.AlertType.ERROR);
                 alert.setTitle("Error");
