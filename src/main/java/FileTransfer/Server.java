@@ -163,7 +163,7 @@ public class Server extends UntypedActor {
                 FileElement newElement = new FileElement(occupied, request.getSize(),
                         request.getTags());
                 if(fileTable.createOrUpdateEntry(request.getFileName(), newElement)==false){
-                    log.error("Someone tried to send me the file {} I already own", request.getFileName());
+                    log.info("Someone tried to send me the file {} I already own", request.getFileName());
                 }
             } else {
                 if (myFreeSpace >= request.getSize()){
@@ -172,7 +172,7 @@ public class Server extends UntypedActor {
                     FileElement newElement = new FileElement(occupied, request.getSize(),
                             request.getTags());
                     if(fileTable.createOrUpdateEntry(request.getFileName(), newElement)==false){
-                        log.error("Someone tried to send me the file {} I already own", request.getFileName());
+                        log.info("Someone tried to send me the file {} I already own", request.getFileName());
                     }                
                     getSender().tell(new SimpleAnswer(true), getSelf());
                     log.debug("Received AllocationRequest. Sending out the response: true");

@@ -24,13 +24,13 @@ public class FXMLModifyController implements Initializable {
         AllocationRequest newReq = new AllocationRequest(GUI.ModifiedFile.getName(), modifile.length(), GUI.ModifiedFile.getTags(), false);
         GuiActor.getServer().tell(newReq, GuiActor.getGuiActorRef());
         
-        if(modifile.length() == 0)
+        if(modifile.length() == 0){
             GuiActor.getClusterListenerActorRef().tell(
                 new EndModify(ModifiedFile.getName(), ModifiedFile.getTags(), modifile.length()),
-                GuiActor.getGuiActorRef());
-
-        //ERROR: can't show the main stage before the check of the clusterListener
-        GUI.getStage().show();
+                    GuiActor.getGuiActorRef());
+            
+            GUI.getStage().show();
+        }
     }
 
     @Override

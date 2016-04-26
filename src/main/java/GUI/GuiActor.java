@@ -132,7 +132,8 @@ public class GuiActor extends UntypedActor {
             FileTransferResult ftr = (FileTransferResult) message;
             log.info("FileTransferResult: {}", ftr);
 
-            if (GUI.getStage().isShowing()) {
+            //if (GUI.getStage().isShowing()) {
+            if (ftr.getFileName().equals(GUI.ModifiedFile.getName())){
 
                 switch (ftr.getMessageType()) {
                     case FILE_RECEIVED_SUCCESSFULLY:
@@ -171,13 +172,12 @@ public class GuiActor extends UntypedActor {
             }
         } else if (message instanceof SimpleAnswer) {
             SimpleAnswer sa = (SimpleAnswer) message;
-            if (sa.getAnswer()) {
+            if (sa.getAnswer()==true) {
                 File modifile = new File(GuiActor.getFilePath() + GUI.ModifiedFile.getName());
                 GuiActor.getClusterListenerActorRef().tell(
                         new EndModify(GUI.ModifiedFile.getName(), GUI.ModifiedFile.getTags(), modifile.length()),
                         GuiActor.getGuiActorRef());
 
-                //ERROR: can't show the main stage before the check of the clusterListener
                 GUI.getStage().show();
             } else {
                 Alert alert = new Alert(Alert.AlertType.ERROR);
