@@ -215,10 +215,11 @@ public class ClusterListenerActor extends UntypedActor {
             //check if i'm the choosen by the load distribution
             if (newOwnerId.equals(Utilities.computeId(Utilities.getAddress(getSelf().path().address(), clusterSystemPort)))) {
                 //no transfer is needed
-
+                log.info("I am the receiver of the load balancing of file {}", fileName);
                 //Just update tags into infoTable
                 getSelf().tell(new SpreadTags(fileName, mNewFileCreation.getTags(), newOwnerId), getSelf());
             } else {
+                log.info("I going send the file to {} for load balancing", newOwner);
                 //file transfer SEND
                 final ActorRef asker = getContext().actorOf(Props
                         .create(FileTransferActor.class,

@@ -102,9 +102,9 @@ public class GuiActor extends UntypedActor {
                 GUI.getSecondaryStage().close();
 
                 //tell to the server to create a new entry for the FileTable
-                AllocationRequest newReq = new AllocationRequest(GUI.ModifiedFile.getName(), 0, GUI.ModifiedFile.getTags(), true);
+                AllocationRequest newReq = new AllocationRequest(GUI.OpenedFile.getName(), 0, GUI.OpenedFile.getTags(), true);
                 server.tell(newReq, getSelf());
-                File file = new File(filePath + GUI.ModifiedFile.getName());
+                File file = new File(filePath + GUI.OpenedFile.getName());
                 file.createNewFile();
                 file.setWritable(true);
 
@@ -133,8 +133,8 @@ public class GuiActor extends UntypedActor {
             log.info("FileTransferResult: {}", ftr);
 
             //if (GUI.getStage().isShowing()) {
-            if (ftr.getFileName().equals(GUI.ModifiedFile.getName())){
-
+            if (ftr.getFileName().equals(GUI.OpenedFile.getName())){
+                GUI.getStage().show();
                 switch (ftr.getMessageType()) {
                     case FILE_RECEIVED_SUCCESSFULLY:
                         boolean isWrite = (ftr.getFileModifier() == EnumFileModifier.WRITE);
@@ -149,8 +149,6 @@ public class GuiActor extends UntypedActor {
                         } else {
                             //startRead(file)... not really a method, just a line of code
                             Desktop.getDesktop().open(file);
-
-                            GUI.getStage().show();
                         }
 
                         break;
@@ -162,7 +160,6 @@ public class GuiActor extends UntypedActor {
                         alert.setContentText("An error occurred during file transfer!");
 
                         alert.showAndWait();
-                        GUI.getStage().show();
                         break;
 
                     //following case handles progress bars during load balancing...
@@ -172,21 +169,22 @@ public class GuiActor extends UntypedActor {
             }
         } else if (message instanceof SimpleAnswer) {
             SimpleAnswer sa = (SimpleAnswer) message;
+            System.out.printf("I received the simpleAnswer %s from the server\n", sa.getAnswer());
             if (sa.getAnswer()==true) {
-                File modifile = new File(GuiActor.getFilePath() + GUI.ModifiedFile.getName());
+                System.out.printf("I entered the if branch\n");
+                File modifile = new File(GuiActor.getFilePath() + GUI.OpenedFile.getName());
                 GuiActor.getClusterListenerActorRef().tell(
-                        new EndModify(GUI.ModifiedFile.getName(), GUI.ModifiedFile.getTags(), modifile.length()),
+                        new EndModify(GUI.OpenedFile.getName(), GUI.OpenedFile.getTags(), modifile.length()),
                         GuiActor.getGuiActorRef());
-
-                GUI.getStage().show();
+            System.out.printf("simple answer handling: Is the gui shown? %s", GUI.getStage().isShowing());
             } else {
                 Alert alert = new Alert(Alert.AlertType.ERROR);
                 alert.setTitle("Error");
                 alert.setHeaderText("Insufficient free space");
-                alert.setContentText("You have not enough free space for the modifies you would apply to the file " + GUI.ModifiedFile.getName() + "!");
+                alert.setContentText("You have not enough free space for the modifies you would apply to the file " + GUI.OpenedFile.getName() + "!");
 
                 alert.showAndWait();
-                GUI.getStage().show();
+            System.out.printf("simple answer handling if answer is not: Is the gui shown? %s", GUI.getStage().isShowing());   
             }
         }
 

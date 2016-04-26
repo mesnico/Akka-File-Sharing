@@ -57,7 +57,7 @@ public class FXMLCreateController implements Initializable {
             if(!tag.isEmpty() && !tags.contains(tag)) tags.add(tag);
             tag = tag4.getText();
             if(!tag.isEmpty() && !tags.contains(tag)) tags.add(tag);
-            GUI.ModifiedFile.set(newFileName, tags);
+            GUI.OpenedFile.set(newFileName, tags);
             
             //chech for existing files with the same name
             GuiActor.getClusterListenerActorRef().tell(new SendCreationRequest(newFileName), GuiActor.getGuiActorRef());
