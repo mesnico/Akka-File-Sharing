@@ -105,7 +105,11 @@ public class GuiActor extends UntypedActor {
                 AllocationRequest newReq = new AllocationRequest(GUI.ModifiedFile.getName(), 0, GUI.ModifiedFile.getTags(), true);
                 server.tell(newReq, getSelf());
                 File file = new File(filePath + GUI.ModifiedFile.getName());
-                file.createNewFile();
+                if(file.exists()){
+                    
+                }else{
+                    file.createNewFile();
+                }
                 file.setWritable(true);
 
                 startModify(file);

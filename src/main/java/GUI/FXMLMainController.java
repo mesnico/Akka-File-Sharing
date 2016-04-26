@@ -3,6 +3,7 @@ package GUI;
 import FileTransfer.messages.EnumFileModifier;
 import GUI.messages.SearchRequest;
 import GUI.messages.SendFileRequest;
+import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.ResourceBundle;
@@ -18,30 +19,32 @@ import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.WindowEvent;
 
 public class FXMLMainController implements Initializable {
+
     @FXML
     private Label label;
     @FXML
     private TextField search;
     @FXML
     private TableView<FileEntry> table;
-    
+
     private static TableView<FileEntry> tableView;
-    
+    private static FileChooser fc = new FileChooser();
+
     @FXML
     private void modify(ActionEvent event) {
         System.out.println("You clicked Modify!");
         FileEntry row = table.getSelectionModel().getSelectedItem();
-        if(row != null){
+        if (row != null) {
             System.out.println(row);
             GuiActor.getClusterListenerActorRef().tell(new SendFileRequest(row.getFileName(), row.getOwner(), EnumFileModifier.WRITE), GuiActor.getGuiActorRef());
-            
+
             //this has to be done in another message...
             //createStage("Modify",true);
-
         } else {
             Alert alert = new Alert(AlertType.ERROR);
             alert.setTitle("Error");
@@ -51,12 +54,12 @@ public class FXMLMainController implements Initializable {
             alert.showAndWait();
         }
     }
-    
+
     @FXML
     private void read(ActionEvent event) {
         System.out.println("You clicked Read!");
         FileEntry row = table.getSelectionModel().getSelectedItem();
-        if(row != null){
+        if (row != null) {
             System.out.println(row);
             //GuiActor.getClusterListenerActorRef().tell(new SendModifyRequest(row.getName(), row.getOwner(), FileModifier.READ), GuiActor.getGuiActorRef());
 
@@ -70,11 +73,11 @@ public class FXMLMainController implements Initializable {
             alert.showAndWait();
         }
     }
-    
+
     @FXML
     private void create(ActionEvent event) {
         System.out.println("You clicked Create new file!");
-        
+
         try {
             FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/fxml/Create.fxml"));
             Parent root = (Parent) fxmlLoader.load();
@@ -82,38 +85,69 @@ public class FXMLMainController implements Initializable {
             stage.setScene(new Scene(root));
             stage.setTitle("Create");
             
+            stage.setOnCloseRequest((final WindowEvent windowEvent) -> {
+                GUI.getStage().show();
+            });
+
             GUI.setSecondaryStage(stage);
             GUI.getSecondaryStage().show();
             GUI.getStage().hide();
-            
-        } catch(Exception ex) {
+
+        } catch (Exception ex) {
             System.out.println(ex.getMessage());
             System.out.println(ex.getCause().toString());
         }
         
-        GUI.getSecondaryStage().setOnCloseRequest((final WindowEvent windowEvent) -> { GUI.getStage().show(); });
     }
-    
+
+    @FXML
+    private void add() {
+        //file_name
+        File selectedFile = fc.showOpenDialog(GUI.getStage());
+        if (selectedFile != null) {
+            //TODO: transfer the file...
+            try {
+                FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/fxml/Create.fxml"));
+                Parent root = (Parent) fxmlLoader.load();
+                Stage stage = new Stage();
+                stage.setScene(new Scene(root));
+                stage.setTitle("Create");
+                TextField tf = (TextField) stage.getScene().lookup("#file_name");
+                tf.setText(selectedFile.getName());
+                tf.disabledProperty();
+                stage.setOnCloseRequest((final WindowEvent windowEvent) -> {
+                    GUI.getStage().show();
+                });
+
+                GUI.setSecondaryStage(stage);
+                GUI.getSecondaryStage().show();
+                GUI.getStage().hide();
+
+            } catch (Exception ex) {
+                System.out.println(ex.getMessage());
+                System.out.println(ex.getCause().toString());
+            }
+        }
+    }
+
     @FXML
     private void search(ActionEvent event) {
         String searchText = search.getText();
         label.setText(searchText);
-        if(!searchText.isEmpty()){
+        if (!searchText.isEmpty()) {
             //empty the table to reset result in case of 0 matches
             //more in detail: TagSearchResponse is not sent to clusterListener, who do not send the (void) list to guiActor
             getTable().setItems(FXCollections.observableList(new ArrayList<FileEntry>()));
-            
+
             //require the file
             /*
             SearchFile message = new SearchFile(filter(search.getText()));//filter is a function that help to check the correctness of the search
             GuiActor.controllerActorRef.tell(message, GuiActor.guiActorRef);
-            */
+             */
             //another message will handle the generation of the raws in the TableView
-            
             //initiate the search
             GuiActor.getClusterListenerActorRef().tell(new SearchRequest(searchText), GuiActor.getGuiActorRef());
-        }
-        else{
+        } else {
             Alert alert = new Alert(AlertType.ERROR);
             alert.setTitle("Error");
             alert.setHeaderText("Void search");
@@ -122,12 +156,14 @@ public class FXMLMainController implements Initializable {
             alert.showAndWait();
         }
     }
-    public static TableView<FileEntry> getTable(){
+
+    public static TableView<FileEntry> getTable() {
         return tableView;
     }
-    
+
     @Override
     public void initialize(URL url, ResourceBundle rb) {
         tableView = table;
+        fc.setTitle("Choose one file to import");
     }
 }
