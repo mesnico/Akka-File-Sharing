@@ -1,6 +1,7 @@
 package FileTransfer.messages;
 
 import java.io.Serializable;
+import java.util.List;
 
 /*
  * To change this license header, choose License Headers in Project Properties.
@@ -17,6 +18,7 @@ public class FileTransferResult implements Serializable {
     private EnumEnding msg;
     private String fileName;
     private EnumFileModifier modifier;
+    private List<String> tags;
     
     public FileTransferResult(EnumEnding msg){
         this.msg = msg;
@@ -33,6 +35,13 @@ public class FileTransferResult implements Serializable {
         this.fileName = fileName;
         this.modifier = modifier;
     }
+
+    public FileTransferResult(EnumEnding msg, String fileName, EnumFileModifier modifier, List<String> tags) {
+        this.msg = msg;
+        this.fileName = fileName;
+        this.modifier = modifier;
+        this.tags = tags;
+    }
     
     public EnumEnding getMessageType(){
         return msg;
@@ -44,6 +53,10 @@ public class FileTransferResult implements Serializable {
     
     public EnumFileModifier getFileModifier(){
         return modifier;
+    }
+
+    public List<String> getTags() {
+        return tags;
     }
     
     @Override

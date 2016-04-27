@@ -7,14 +7,13 @@ import ClusterListenerActor.messages.FreeSpaceSpread;
 import ClusterListenerActor.messages.CreationRequest;
 import ClusterListenerActor.messages.UpdateTag;
 import ClusterListenerActor.messages.CreationResponse;
+import ClusterListenerActor.messages.FakeFileTransfer;
 import ClusterListenerActor.messages.Shutdown;
 import ClusterListenerActor.messages.SpreadTags;
 import ClusterListenerActor.messages.TagSearchRequest;
 import ClusterListenerActor.messages.TagSearchResponse;
 import FileTransfer.FileTransferActor;
 import FileTransfer.messages.EnumBehavior;
-import FileTransfer.messages.EnumEnding;
-import FileTransfer.messages.FileTransferResult;
 import FileTransfer.messages.Handshake;
 import FileTransfer.messages.SendFreeSpaceSpread;
 import GUI.messages.SearchRequest;
@@ -258,9 +257,8 @@ public class ClusterListenerActor extends UntypedActor {
 
                 log.info("Not needed to transfer the file {} from remote: the owner is myself!", fileRequest.getFileName());
 
-                FileTransferResult result = new FileTransferResult(EnumEnding.FILE_RECEIVED_SUCCESSFULLY,
-                        fileRequest.getFileName(), fileRequest.getModifier());
-                guiActor.tell(result, getSelf());
+                FakeFileTransfer fakeFileTransfer = new FakeFileTransfer(fileRequest.getFileName());
+                server.tell(fakeFileTransfer, getSelf());
             } else {
                 log.info("Starting remote transfering for the file {}", fileRequest.getFileName());
                 //file transfer REQUEST

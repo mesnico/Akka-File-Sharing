@@ -10,9 +10,11 @@
 package FileTransfer;
 
 import ClusterListenerActor.Utilities;
+import ClusterListenerActor.messages.FakeFileTransfer;
 import ClusterListenerActor.messages.SpreadTags;
 import FileTransfer.messages.AllocationRequest;
 import FileTransfer.messages.AuthorizationReply;
+import FileTransfer.messages.EnumEnding;
 import FileTransfer.messages.EnumFileModifier;
 import FileTransfer.messages.FileTransferResult;
 import FileTransfer.messages.Handshake;
@@ -36,6 +38,7 @@ import akka.io.TcpMessage;
 import com.typesafe.config.Config;
 import java.io.File;
 import java.util.HashMap;
+import java.util.List;
 
 
 public class Server extends UntypedActor {
@@ -69,7 +72,7 @@ public class Server extends UntypedActor {
     private void senderRollBack(FileTransferResult fileTransferResult){
         String fileName = fileTransferResult.getFileName();
         if (fileTransferResult.getFileModifier() == EnumFileModifier.WRITE){
-            fileTable.freeEntry(fileName);
+            fileTable.setOccupied(fileName,false);
         }
     }
 
@@ -194,8 +197,46 @@ public class Server extends UntypedActor {
             AuthorizationReply reply = fileTable.testAndSet(handshake.getFileName(), handshake.getModifier());
             log.debug("Received Handshake. Sending out AuthReply: {}",reply);
             getSender().tell(reply, getSelf());
+            
+        } else if (msg instanceof FakeFileTransfer){
+            String fileName = ((FakeFileTransfer) msg).getFileName();
+            log.debug("The fake file transfer is received. Sending back the tags for file {}", fileName);
+            fileTable.setOccupied(fileName, true);
+            // --- TODO: notavo che, riguardo ai membri dato della classe FileElement,
+            // --- ognuno di essi ovviamente ha un getter/setter.
+            // --- Inoltre, per alcuni di essi, come occupied, abbiamo anche le funzioni per
+            // --- lavorarci direttamente da un elemento di tipo FileTable (ad es
+            // --- fileTable.setOccupied(fileName)), mentre per altri, come i tag, questa
+            // --- scorciatoia non c'e', bisogna fare a mano di prima recuperare l'elemento,
+            // --- e poi fare getTags su di esso. Vogliamo uniformare le due cose?
+            // --- beh, io intanto l'ho fatta questa scorciatoia, poi vediamo se tenerla o no
+            
+            // --- IO MI INTERROMPO QUA
+            // --- perchè ci sono alcune cose che non mi tornano: (facendo riferimento al caso
+            // --- in cui faccio "modify" oppure "read" di un file che gia' possiedo)
+            // 1) perchè mi servono già i tags? non ho ancora modificato il file, la dimensione
+            // non e' variata, non vedo perche' dovremmo gia' avvisare il cluster. Non basta
+            // che questi vengano restituiti dopo che ho fatto la done ed ho ricevuto 
+            // la simpleAnswer? L'unico caso in cui puo' aver senso e' se, dopo aver fatto la
+            // modify, la dimensione e' 0, caso in cui non arriva la simpleAnswer.
+            // 2) cosa si manda come risultato? un FILE_RECEIVED_SUCCESSFULLY, immagino
+            // 3) mi sa che nel messaggio SendFileRequest bisogna specificare anche se 
+            // volevo leggere o scrivere. Anzi no perche' la lettura e' molto semplice, non 
+            // bisogna neanche modificare le fileInfoTable
+            // 4) A proposito: Nel caso che io voglia leggere un file che gia' possiedo,
+            // lo copiamo nella cartella temporanea o no? a regola si', perche' se e'
+            // in lettura non lo blocchiamo, e dobbiamo permettere che, mentre noi lo
+            // leggiamo, qualcun altro lo possa prendere in scrittura
+            //*** FLUSH DEL MIO CERVELLO EFFETTUATO *** //
+            List<String> tags = fileTable.getTags(fileName);
+            FileTransferResult fileTransferResult = new FileTransferResult(
+                    EnumEnding.FILE_RECEIVED_SUCCESSFULLY, fileName, EnumFileModifier.WRITE, tags);
         }
-        
+            
+            
+            //send back FileTransferResult with the tags
+            
+            
         // ------------------------------ //
         // ---- FILE TRANSFER RESULT ---- //
         // ------------------------------ //
