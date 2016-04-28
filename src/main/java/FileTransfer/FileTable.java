@@ -68,10 +68,10 @@ public class FileTable {
         return e;
     }
     
-    public boolean setOccupied(String fileName, boolean occupied){
+    public boolean freeEntry(String fileName){
         FileElement e = fileTable.get(fileName);
         if(e == null) return false;
-        fileTable.get(fileName).setOccupied(occupied);
+        fileTable.get(fileName).setOccupied(false);
         return true;
     }
     
@@ -103,10 +103,6 @@ public class FileTable {
     
     public FileElement getFileElement(String fileName){
         return fileTable.get(fileName);
-    }
-    
-    public List<String>getTags(String fileName){
-        return fileTable.get(fileName).getTags();
     }
     
     /*
