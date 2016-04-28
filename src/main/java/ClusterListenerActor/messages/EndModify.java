@@ -15,22 +15,16 @@ import java.util.List;
  */
 public class EndModify implements Serializable{
     String fileName;
-    List<String> tags;
     long fileByteSize;
 
-    public EndModify(String fileName, List<String> tags, long fileByteSize) {
+    public EndModify(String fileName, long fileByteSize) {
         this.fileName = fileName;
-        this.tags = tags;
         this.fileByteSize = fileByteSize;
         //this.ownerId = ownerId;
     }
 
     public String getFileName() {
         return fileName;
-    }
-
-    public List<String> getTags() {
-        return tags;
     }
 
     public long getFileByteSize() {

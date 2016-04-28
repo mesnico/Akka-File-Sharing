@@ -37,6 +37,10 @@ class FileElement{
             this.occupied = occupied;
     }
 
+    public void setSize(long size) {
+        this.size = size;
+    }
+
     public long getSize() {
         return size;
     }
@@ -68,10 +72,10 @@ public class FileTable {
         return e;
     }
     
-    public boolean freeEntry(String fileName){
+    public boolean setOccupied(String fileName, boolean occupied){
         FileElement e = fileTable.get(fileName);
         if(e == null) return false;
-        fileTable.get(fileName).setOccupied(false);
+        fileTable.get(fileName).setOccupied(occupied);
         return true;
     }
     

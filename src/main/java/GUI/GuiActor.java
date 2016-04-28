@@ -5,8 +5,10 @@
  */
 package GUI;
 
+import ClusterListenerActor.Utilities;
 import ClusterListenerActor.messages.CreationResponse;
 import ClusterListenerActor.messages.EndModify;
+import ClusterListenerActor.messages.SpreadTags;
 import ClusterListenerActor.messages.TagSearchGuiResponse;
 import FileTransfer.messages.AllocationRequest;
 import FileTransfer.messages.EnumFileModifier;
@@ -23,6 +25,8 @@ import com.typesafe.config.Config;
 import java.awt.Desktop;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXMLLoader;
@@ -100,15 +104,30 @@ public class GuiActor extends UntypedActor {
             if (((CreationResponse) message).isSuccess()) {
                 //from a request of creation I obtained positive response => Start che creation and modify of the new file
                 GUI.getSecondaryStage().close();
-
+                File newFile, fileToImport;
+                newFile = new File(filePath + GUI.OpenedFile.getName()); 
+                if(GUI.OpenedFile.getImportedFile()!= null){
+                    Files.copy(GUI.OpenedFile.getImportedFile().toPath(), newFile.toPath(), REPLACE_EXISTING);
+                } else {
+                    newFile.createNewFile();
+                }
+                
                 //tell to the server to create a new entry for the FileTable
-                AllocationRequest newReq = new AllocationRequest(GUI.OpenedFile.getName(), 0, GUI.OpenedFile.getTags(), true);
+                AllocationRequest newReq = new AllocationRequest(GUI.OpenedFile.getName(), newFile.length(),
+                        GUI.OpenedFile.getTags(), (newFile.length()==0)?true:false);
+                
+                //spread the tags
+                SpreadTags tagsMessage = new SpreadTags(GUI.OpenedFile.getName(), 
+                        GUI.OpenedFile.getTags(), 
+                        Utilities.computeId(Utilities.getAddress(getSelf().path().address(), clusterSystemPort)));
+                        clusterListenerActorRef.tell(tagsMessage, getSelf());
                 server.tell(newReq, getSelf());
-                File file = new File(filePath + GUI.OpenedFile.getName());
-                file.createNewFile();
-                file.setWritable(true);
-
-                startModify(file);
+                
+                //the edit is performed only if the new file size is 0
+                if(newFile.length()==0){
+                    startModify(newFile);
+                }
+                
             } else {
                 Alert alert = new Alert(Alert.AlertType.ERROR);
                 alert.setTitle("Error");
@@ -169,14 +188,12 @@ public class GuiActor extends UntypedActor {
             }
         } else if (message instanceof SimpleAnswer) {
             SimpleAnswer sa = (SimpleAnswer) message;
-            System.out.printf("I received the simpleAnswer %s from the server\n", sa.getAnswer());
+            log.debug("I received the simpleAnswer {} from the server", sa.getAnswer());
             if (sa.getAnswer()==true) {
-                System.out.printf("I entered the if branch\n");
                 File modifile = new File(GuiActor.getFilePath() + GUI.OpenedFile.getName());
                 GuiActor.getClusterListenerActorRef().tell(
-                        new EndModify(GUI.OpenedFile.getName(), GUI.OpenedFile.getTags(), modifile.length()),
+                        new EndModify(GUI.OpenedFile.getName(), modifile.length()),
                         GuiActor.getGuiActorRef());
-            System.out.printf("simple answer handling: Is the gui shown? %s", GUI.getStage().isShowing());
             } else {
                 Alert alert = new Alert(Alert.AlertType.ERROR);
                 alert.setTitle("Error");
@@ -184,7 +201,13 @@ public class GuiActor extends UntypedActor {
                 alert.setContentText("You have not enough free space for the modifies you would apply to the file " + GUI.OpenedFile.getName() + "!");
 
                 alert.showAndWait();
-            System.out.printf("simple answer handling if answer is not: Is the gui shown? %s", GUI.getStage().isShowing());   
+                System.out.printf("simple answer handling if answer is not: Is the gui shown? %s", GUI.getStage().isShowing());   
+                
+                /*
+                    TODO: handle rollback:
+                            deleting all tags and the file itself
+                */
+                    
             }
         }
 

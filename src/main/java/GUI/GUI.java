@@ -1,6 +1,7 @@
 package GUI;
 
 import akka.actor.PoisonPill;
+import java.io.File;
 import java.util.List;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
@@ -13,6 +14,7 @@ import javafx.stage.WindowEvent;
 public class GUI extends Application {
     //this structure is needed to store name and tags of the file under modify (creazione)
     static public class OpenedFile{
+        private static File importedFile;
         private static String fileName;
         private static List<String> tags;
 
@@ -20,9 +22,16 @@ public class GUI extends Application {
             OpenedFile.fileName = fileName;
             OpenedFile.tags = tags;
         }
+        public static void set(File importedFile){
+            OpenedFile.importedFile = importedFile;
+        }
         public static void set(String fileName){
             OpenedFile.fileName = fileName;
         }
+
+        public static File getImportedFile() {
+            return importedFile;
+        } 
         
         public static String getName(){
             return OpenedFile.fileName;

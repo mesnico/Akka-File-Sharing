@@ -2,6 +2,7 @@ package GUI;
 
 import ClusterListenerActor.messages.EndModify;
 import FileTransfer.messages.AllocationRequest;
+import FileTransfer.messages.UpdateFileEntry;
 import GUI.GUI.OpenedFile;
 import java.io.File;
 import java.net.URL;
@@ -19,15 +20,10 @@ public class FXMLModifyController implements Initializable {
         
         //the file under modify is: GUI.ModifiedFile.getName();
         
-        //free busy-ness
-        //but if the file has size zero send directly to EndModify message
-        AllocationRequest newReq = new AllocationRequest(GUI.OpenedFile.getName(), modifile.length(), GUI.OpenedFile.getTags(), false);
-        GuiActor.getServer().tell(newReq, GuiActor.getGuiActorRef());
-        
-        if(modifile.length() == 0){
-            GuiActor.getClusterListenerActorRef().tell(new EndModify(OpenedFile.getName(), OpenedFile.getTags(), modifile.length()),
-                    GuiActor.getGuiActorRef());           
-        }
+        //the UpdateFileEntry is sent to free the file and to set the new file size after the modify.
+        UpdateFileEntry updateRequest = new UpdateFileEntry(OpenedFile.getName(),modifile.length(),false);
+        GuiActor.getServer().tell(updateRequest, GuiActor.getGuiActorRef());
+
         GUI.getStage().show();
     }
 

@@ -19,6 +19,7 @@ import FileTransfer.messages.Handshake;
 import FileTransfer.messages.Hello;
 import FileTransfer.messages.SendFreeSpaceSpread;
 import FileTransfer.messages.SimpleAnswer;
+import FileTransfer.messages.UpdateFileEntry;
 import Startup.AddressResolver;
 import Startup.WatchMe;
 import java.net.InetSocketAddress;
@@ -69,7 +70,7 @@ public class Server extends UntypedActor {
     private void senderRollBack(FileTransferResult fileTransferResult){
         String fileName = fileTransferResult.getFileName();
         if (fileTransferResult.getFileModifier() == EnumFileModifier.WRITE){
-            fileTable.freeEntry(fileName);
+            fileTable.setOccupied(fileName,false);
         }
     }
 
@@ -163,8 +164,9 @@ public class Server extends UntypedActor {
                 FileElement newElement = new FileElement(occupied, request.getSize(),
                         request.getTags());
                 if(fileTable.createOrUpdateEntry(request.getFileName(), newElement)==false){
-                    log.info("Someone tried to send me the file {} I already own", request.getFileName());
+                    log.warning("Someone tried to send me the file {} I already own", request.getFileName());
                 }
+                log.debug("Received AllocationRequest. The size was 0 so no SimpleAnswer is sent back");
             } else {
                 if (myFreeSpace >= request.getSize()){
                     myFreeSpace -= request.getSize();
@@ -172,7 +174,7 @@ public class Server extends UntypedActor {
                     FileElement newElement = new FileElement(occupied, request.getSize(),
                             request.getTags());
                     if(fileTable.createOrUpdateEntry(request.getFileName(), newElement)==false){
-                        log.info("Someone tried to send me the file {} I already own", request.getFileName());
+                        log.warning("Someone tried to send me the file {} I already own", request.getFileName());
                     }                
                     getSender().tell(new SimpleAnswer(true), getSelf());
                     log.debug("Received AllocationRequest. Sending out the response: true");
@@ -181,8 +183,27 @@ public class Server extends UntypedActor {
                     log.debug("Received AllocationRequest. Sending out the response: false");
                 }
             }
-        } 
-        
+            
+        } else if (msg instanceof UpdateFileEntry){
+            boolean permit;
+            UpdateFileEntry updateRequest = (UpdateFileEntry)msg;
+            log.debug("UpdateFileEntry was received: {}", updateRequest);
+            if (myFreeSpace >= updateRequest.getSize()){
+                FileElement toUpdate = fileTable.getFileElement(updateRequest.getFileName());
+                if(toUpdate == null){
+                    log.error("Fatal error! The FileEntry was not present for file {}",updateRequest.getFileName());
+                }
+                toUpdate.setOccupied(updateRequest.isOccupied());
+                toUpdate.setSize(updateRequest.getSize());
+                permit = true;
+            } else {
+                permit = false;
+            }
+            SimpleAnswer answer = new SimpleAnswer(permit);
+            getSender().tell(answer, getSelf());
+            
+        }
+            
         // --------------------------- //
         // ---- HANDSHAKE MESSAGE ---- //
         // --------------------------- //        
