@@ -104,24 +104,31 @@ public class GuiActor extends UntypedActor {
             if (((CreationResponse) message).isSuccess()) {
                 //from a request of creation I obtained positive response => Start che creation and modify of the new file
                 GUI.getSecondaryStage().close();
-                File newFile, fileToImport;
-                newFile = new File(filePath + GUI.OpenedFile.getName()); 
-                if(GUI.OpenedFile.getImportedFile()!= null){
-                    Files.copy(GUI.OpenedFile.getImportedFile().toPath(), newFile.toPath(), REPLACE_EXISTING);
-                } else {
-                    newFile.createNewFile();
+                File newFile;
+                newFile = new File(filePath + GUI.OpenedFile.getName());
+                try{
+                    if(GUI.OpenedFile.getImportedFile()!= null){
+                        if(GUI.OpenedFile.getImportedFile().compareTo(newFile)!=0){
+                            Files.copy(GUI.OpenedFile.getImportedFile().toPath(), newFile.toPath(), REPLACE_EXISTING);
+                        }
+                    } else {
+                        newFile.createNewFile();
+                    }
+                } catch(IOException ioe){
+                    log.error("A file I/O error occurred while copying or creating the new file!");
+                    //TODO: destroy the program.
                 }
                 
                 //tell to the server to create a new entry for the FileTable
                 AllocationRequest newReq = new AllocationRequest(GUI.OpenedFile.getName(), newFile.length(),
                         GUI.OpenedFile.getTags(), (newFile.length()==0)?true:false);
+                server.tell(newReq, getSelf());
                 
                 //spread the tags
                 SpreadTags tagsMessage = new SpreadTags(GUI.OpenedFile.getName(), 
                         GUI.OpenedFile.getTags(), 
                         Utilities.computeId(Utilities.getAddress(getSelf().path().address(), clusterSystemPort)));
-                        clusterListenerActorRef.tell(tagsMessage, getSelf());
-                server.tell(newReq, getSelf());
+                clusterListenerActorRef.tell(tagsMessage, getSelf());
                 
                 //the edit is performed only if the new file size is 0
                 if(newFile.length()==0){

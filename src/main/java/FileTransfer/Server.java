@@ -192,6 +192,7 @@ public class Server extends UntypedActor {
                 FileElement toUpdate = fileTable.getFileElement(updateRequest.getFileName());
                 if(toUpdate == null){
                     log.error("Fatal error! The FileEntry was not present for file {}",updateRequest.getFileName());
+                    return;
                 }
                 toUpdate.setOccupied(updateRequest.isOccupied());
                 toUpdate.setSize(updateRequest.getSize());
