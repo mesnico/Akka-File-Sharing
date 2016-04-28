@@ -17,6 +17,7 @@ import FileTransfer.messages.EnumEnding;
 import FileTransfer.messages.FileTransferResult;
 import FileTransfer.messages.Handshake;
 import FileTransfer.messages.SendFreeSpaceSpread;
+import FileTransfer.messages.UpdateFileEntry;
 import GUI.messages.SearchRequest;
 import GUI.messages.SendCreationRequest;
 import GUI.messages.SendFileRequest;
@@ -256,9 +257,14 @@ public class ClusterListenerActor extends UntypedActor {
 
                 log.info("Not needed to transfer the file {} from remote: the owner is myself!", fileRequest.getFileName());
 
+                //"fake" file transfer message
                 FileTransferResult result = new FileTransferResult(EnumEnding.FILE_RECEIVED_SUCCESSFULLY,
                         fileRequest.getFileName(), fileRequest.getModifier());
                 guiActor.tell(result, getSelf());
+                
+                /*
+                        TODO: Send Handshake!!
+                */
             } else {
                 log.info("Starting remote transfering for the file {}", fileRequest.getFileName());
                 //file transfer REQUEST
