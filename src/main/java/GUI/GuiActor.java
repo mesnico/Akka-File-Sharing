@@ -134,7 +134,7 @@ public class GuiActor extends UntypedActor {
                 if(newFile.length()==0){
                     startModify(newFile);
                 }
-                
+
             } else {
                 Alert alert = new Alert(Alert.AlertType.ERROR);
                 alert.setTitle("Error");
