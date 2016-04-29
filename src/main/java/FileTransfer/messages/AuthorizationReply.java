@@ -18,15 +18,17 @@ public class AuthorizationReply implements Serializable {
     private EnumAuthorizationReply response;
     private long size;
     private List<String> tags;
+    private String fileName;
     
     public AuthorizationReply(EnumAuthorizationReply response){
         this.response = response;
     }
     
-    public AuthorizationReply(EnumAuthorizationReply response, long size, List<String> tags){
+    public AuthorizationReply(String fileName, EnumAuthorizationReply response, long size, List<String> tags){
         this.response = response;
         this.size = size;
         this.tags = tags;
+        this.fileName = fileName;
     }
     
     public EnumAuthorizationReply getResponse(){
@@ -39,6 +41,10 @@ public class AuthorizationReply implements Serializable {
     
     public List<String> getTags(){
         return tags;
+    }
+
+    public String getFileName() {
+        return fileName;
     }
     
     @Override

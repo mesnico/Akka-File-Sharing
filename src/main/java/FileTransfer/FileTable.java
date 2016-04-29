@@ -91,7 +91,9 @@ public class FileTable {
                 System.out.println("[fileTable]: sono nella testAndSet, sto per marcare il file come occupato");
                 fileTable.get(fileName).setOccupied(true);
             }
-            return new AuthorizationReply(EnumAuthorizationReply.AUTHORIZATION_GRANTED, 
+            return new AuthorizationReply(
+                    fileName,
+                    EnumAuthorizationReply.AUTHORIZATION_GRANTED, 
                     fileTable.get(fileName).getSize(), 
                     fileTable.get(fileName).getTags());
         }

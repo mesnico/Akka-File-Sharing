@@ -133,6 +133,8 @@ public class GuiActor extends UntypedActor {
                 //the edit is performed only if the new file size is 0
                 if(newFile.length()==0){
                     startModify(newFile);
+                } else {
+                    GUI.getStage().show();
                 }
 
             } else {

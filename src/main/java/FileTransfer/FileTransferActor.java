@@ -153,7 +153,7 @@ public class FileTransferActor extends UntypedActor {
                 // --- I am the responder, I was spawned by my server for handling an
                 // --- incoming connection. I'll ack the asker peer just to let him know my address
                 ActorSelection interlocutorSelection = getContext().actorSelection("akka.tcp://ClusterSystem@" + interlocutorIp.getHostAddress() + ":"
-                        + remoteClusterSystemPort + "/user/clusterListener/fileTransferSender");
+                        + remoteClusterSystemPort + "/user/clusterListener/fileTransferAsker");
                 FiniteDuration timeout = new FiniteDuration(10, SECONDS);
 
                 interlocutor = Await.result(interlocutorSelection.resolveOne(timeout), timeout);
@@ -343,7 +343,6 @@ public class FileTransferActor extends UntypedActor {
             private FileTransferResult result;
             
             public void terminate(EnumEnding msg) {
-                log.info("The protocol ended earlier then expected. Performing rollBack");
                 result = new FileTransferResult(msg, handshake.getFileName(), handshake.getModifier());
                 myServer.tell(result, getSelf());
                 // --- The unwatch prevents the Terminated message to be handled before the PoisonPill

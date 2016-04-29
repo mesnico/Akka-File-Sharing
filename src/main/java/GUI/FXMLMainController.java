@@ -108,6 +108,7 @@ public class FXMLMainController implements Initializable {
         File selectedFile = fc.showOpenDialog(GUI.getStage());
         if (selectedFile != null) {
             //TODO: transfer the file...
+            GUI.OpenedFile.set(selectedFile);
             try {
                 FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/fxml/Create.fxml"));
                 Parent root = (Parent) fxmlLoader.load();

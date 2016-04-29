@@ -12,8 +12,11 @@ import ClusterListenerActor.messages.SpreadTags;
 import ClusterListenerActor.messages.TagSearchRequest;
 import ClusterListenerActor.messages.TagSearchResponse;
 import FileTransfer.FileTransferActor;
+import FileTransfer.messages.AuthorizationReply;
+import FileTransfer.messages.EnumAuthorizationReply;
 import FileTransfer.messages.EnumBehavior;
 import FileTransfer.messages.EnumEnding;
+import FileTransfer.messages.EnumFileModifier;
 import FileTransfer.messages.FileTransferResult;
 import FileTransfer.messages.Handshake;
 import FileTransfer.messages.SendFreeSpaceSpread;
@@ -225,7 +228,7 @@ public class ClusterListenerActor extends UntypedActor {
                                 InetAddress.getByName(newOwner.address().host().get()),
                                 (int) newOwner.address().port().get(),
                                 new Handshake(EnumBehavior.SEND, fileName)),
-                        "fileTransferSender");
+                        "fileTransferAsker");
                 
                 //don't need to update tags... this is performed at the end of the file send
                 //now we have just to create the file into the FileTable of my server
@@ -256,15 +259,11 @@ public class ClusterListenerActor extends UntypedActor {
                 //no transfer is needed
 
                 log.info("Not needed to transfer the file {} from remote: the owner is myself!", fileRequest.getFileName());
-
-                //"fake" file transfer message
-                FileTransferResult result = new FileTransferResult(EnumEnding.FILE_RECEIVED_SUCCESSFULLY,
-                        fileRequest.getFileName(), fileRequest.getModifier());
-                guiActor.tell(result, getSelf());
                 
-                /*
-                        TODO: Send Handshake!!
-                */
+                //ask for the freeness of the file in order to be opened in write mode
+                Handshake handshake = new Handshake(null,fileRequest.getFileName(),EnumFileModifier.WRITE);
+                server.tell(handshake, getSelf());
+                
             } else {
                 log.info("Starting remote transfering for the file {}", fileRequest.getFileName());
                 //file transfer REQUEST
@@ -273,8 +272,20 @@ public class ClusterListenerActor extends UntypedActor {
                                 InetAddress.getByName(fileOwner.address().host().get()),
                                 (int) fileOwner.address().port().get(),
                                 new Handshake(EnumBehavior.REQUEST, fileRequest.getFileName(), fileRequest.getModifier())),
-                        "fileTransferRequester");
+                        "fileTransferAsker");
             }
+        
+        } else if (message instanceof AuthorizationReply) {
+            AuthorizationReply reply = (AuthorizationReply)message;
+            FileTransferResult result;
+            if(reply.getResponse() == EnumAuthorizationReply.AUTHORIZATION_GRANTED){
+                result = new FileTransferResult(EnumEnding.FILE_RECEIVED_SUCCESSFULLY,
+                        reply.getFileName(),EnumFileModifier.WRITE);
+            } else {
+                result = new FileTransferResult(EnumEnding.FILE_TO_RECEIVE_BUSY,
+                        reply.getFileName(),EnumFileModifier.WRITE);
+            }
+            guiActor.tell(result, getSelf());
 
         } else if (message instanceof SendCreationRequest) {
             //I send the creation request (the filename tag) to the responsible member
