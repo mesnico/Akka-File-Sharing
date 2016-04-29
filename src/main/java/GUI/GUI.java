@@ -28,6 +28,12 @@ public class GUI extends Application {
         public static void set(String fileName){
             OpenedFile.fileName = fileName;
         }
+        
+        public static void unset(){
+            importedFile = null;
+            fileName = null;
+            tags = null;
+        }
 
         public static File getImportedFile() {
             return importedFile;

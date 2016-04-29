@@ -44,6 +44,7 @@ public class FXMLMainController implements Initializable {
             GuiActor.getClusterListenerActorRef().tell(new SendFileRequest(row.getFileName(), row.getOwner(), EnumFileModifier.WRITE), GuiActor.getGuiActorRef());
             
             GUI.OpenedFile.set(row.getFileName());
+            System.out.println(row.getFileName());
             //this has to be done in another message...
             //createStage("Modify",true);
         } else {

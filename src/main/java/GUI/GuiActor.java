@@ -172,13 +172,14 @@ public class GuiActor extends UntypedActor {
 
                         if (isWrite) {
                             //tags are in fileTable
-
+                            
                             startModify(file);
                         } else {
                             //startRead(file)... not really a method, just a line of code
                             Desktop.getDesktop().open(file);
+                            GUI.OpenedFile.unset();
                         }
-
+                        
                         break;
 
                     case FILE_RECEIVING_FAILED:
@@ -216,8 +217,10 @@ public class GuiActor extends UntypedActor {
                     TODO: handle rollback:
                             deleting all tags and the file itself
                 */
-                    
-            }
+                  
+            }            
+            GUI.OpenedFile.unset();
+            
         }
 
         /*

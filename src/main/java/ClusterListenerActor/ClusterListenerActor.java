@@ -209,8 +209,6 @@ public class ClusterListenerActor extends UntypedActor {
         } else if (message instanceof EndModify) {//this message is generated at the end of the modify operation, to begine the load distribution
             EndModify mNewFileCreation = (EndModify) message;
             String fileName = mNewFileCreation.getFileName();
-
-            //the check for size constraints has already be performed by server (AllocationRequest)
             
             //load distribution
             BigInteger newOwnerId = membersFreeSpace.getHighestFreeSpaceMember();

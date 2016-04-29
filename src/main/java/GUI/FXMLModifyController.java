@@ -24,6 +24,7 @@ public class FXMLModifyController implements Initializable {
         UpdateFileEntry updateRequest = new UpdateFileEntry(OpenedFile.getName(),modifile.length(),false);
         GuiActor.getServer().tell(updateRequest, GuiActor.getGuiActorRef());
 
+        GUI.OpenedFile.unset();
         GUI.getStage().show();
     }
 

@@ -189,6 +189,11 @@ public class Server extends UntypedActor {
             UpdateFileEntry updateRequest = (UpdateFileEntry)msg;
             log.debug("UpdateFileEntry was received: {}", updateRequest);
             if (myFreeSpace >= updateRequest.getSize()){
+                myFreeSpace -= updateRequest.getSize();
+                
+                //tell the cluster the updated size
+                myClusterListener.tell(new SendFreeSpaceSpread(myFreeSpace), getSelf());
+                
                 FileElement toUpdate = fileTable.getFileElement(updateRequest.getFileName());
                 if(toUpdate == null){
                     log.error("Fatal error! The FileEntry was not present for file {}",updateRequest.getFileName());
