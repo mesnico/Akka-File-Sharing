@@ -21,7 +21,6 @@ import Startup.WatchMe;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
 import akka.actor.PoisonPill;
-import akka.actor.Terminated;
 import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
@@ -195,7 +194,6 @@ public class FileTransferActor extends UntypedActor {
             // --- handshake variabile that was given to me by the one who has created me
             interlocutor = getSender();
             interlocutor.tell(handshake, getSelf());
-            getContext().watch(interlocutor);
             changeBehavior();
             log.debug("I have received the Ack, so now I can contact the remote peer");
         } else if (msg instanceof Handshake) {
@@ -209,7 +207,6 @@ public class FileTransferActor extends UntypedActor {
             } else {
                 handshake.setBehavior(EnumBehavior.SEND);
             }
-            getContext().watch(interlocutor);
             changeBehavior();
             log.debug("Handshake message received");
         }
@@ -234,8 +231,6 @@ public class FileTransferActor extends UntypedActor {
                 result = new FileTransferResult(
                         msg, handshake.getFileName(), handshake.getModifier());
                 myServer.tell(result, getSelf());
-                // --- The unwatch prevents the Terminated message to be handled before the PoisonPill
-                getContext().unwatch(interlocutor);
                 getSelf().tell(PoisonPill.getInstance(), getSelf());
             }
 
@@ -302,13 +297,7 @@ public class FileTransferActor extends UntypedActor {
                     FileTransferResult result = (FileTransferResult) msg;
                     terminate(EnumEnding.IO_ERROR_WHILE_SENDING);
                     log.info("The receiver reported: {}", result.getMessageType());
-                } else if (msg instanceof Terminated) {
-                    // --- Thanks to the watch(), I am been informed the interlocutor went down.
-                    EnumEnding ending;
-                    ending = (fileOccupiedByMe == true) ? EnumEnding.FILE_NO_MORE_BUSY
-                            : EnumEnding.FILE_SENDING_FAILED;
-                    terminate(ending);
-                    log.info("Remote peer failed. Sending of {} failed.", handshake.getFileName());
+                    
                 } else if (msg instanceof CommandFailed) {
                     // --- We enter this branch if the OS kernel socket buffer was full
                     // --- TODO: Here we should probably bring down the whole Tcp connection
@@ -345,8 +334,7 @@ public class FileTransferActor extends UntypedActor {
             public void terminate(EnumEnding msg) {
                 result = new FileTransferResult(msg, handshake.getFileName(), handshake.getModifier());
                 myServer.tell(result, getSelf());
-                // --- The unwatch prevents the Terminated message to be handled before the PoisonPill
-                getContext().unwatch(interlocutor);
+
                 getSelf().tell(PoisonPill.getInstance(), getSelf());
             }
 
@@ -450,11 +438,7 @@ public class FileTransferActor extends UntypedActor {
                         terminate(EnumEnding.IO_ERROR_WHILE_RECEIVING);
                         log.error("Error in receiving file {}: there is not enough space on my hard disk", handshake.getFileName());
                     }
-                } else if (msg instanceof Terminated) {
-                    if(output!=null) 
-                        output.close();
-                    terminate(EnumEnding.FILE_RECEIVING_FAILED);
-                    log.error("The remote peer is falled, so I was unable to receive file {}. I will perform a roll back.", handshake.getFileName());
+                    
                 } else if (msg instanceof CommandFailed) {
                     // --- OS kernel socket buffer was full
                     // --- TODO: Here we should probably bring down the whole Tcp connection

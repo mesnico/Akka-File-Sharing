@@ -47,9 +47,10 @@ public class FreeSpaceMembersData {
     
     public FreeSpaceMembersData(){
         freeSpace = new PriorityQueue<FreeSpaceElement>(10,new Comparator<FreeSpaceElement>(){
+            //the comparator needs to be hacked because I want the highest free space member to be on top of the queue
             @Override
             public int compare(FreeSpaceElement o1, FreeSpaceElement o2){
-                return (int)(o1.getFreeByteSpace() - o2.getFreeByteSpace());
+                return (int)(o2.getFreeByteSpace() - o1.getFreeByteSpace());
             }
         });
     }
@@ -89,7 +90,9 @@ public class FreeSpaceMembersData {
             freeSpace.add(new FreeSpaceElement(memberId,newSpace));
             return false;
         } else {
-            element.setFreeByteSpace(newSpace);
+            //element.setFreeByteSpace(newSpace);
+            freeSpace.remove(element);
+            freeSpace.add(new FreeSpaceElement(memberId,newSpace));
             return true;
         }
     }

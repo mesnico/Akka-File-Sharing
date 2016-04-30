@@ -212,6 +212,7 @@ public class ClusterListenerActor extends UntypedActor {
             
             //load distribution
             BigInteger newOwnerId = membersFreeSpace.getHighestFreeSpaceMember();
+            log.debug("The chosen one for taking care of {} is {}",fileName,newOwnerId);
             Member newOwner = membersMap.getMemberById(newOwnerId);
 
             //check if i'm the choosen by the load distribution

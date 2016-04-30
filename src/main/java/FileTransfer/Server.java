@@ -186,21 +186,24 @@ public class Server extends UntypedActor {
             
         } else if (msg instanceof UpdateFileEntry){
             boolean permit;
+            long oldSize;
             UpdateFileEntry updateRequest = (UpdateFileEntry)msg;
             log.debug("UpdateFileEntry was received: {}", updateRequest);
-            if (myFreeSpace >= updateRequest.getSize()){
-                myFreeSpace -= updateRequest.getSize();
+            
+            FileElement toUpdate = fileTable.getFileElement(updateRequest.getFileName());
+            if (toUpdate == null) {
+                log.error("Fatal error! The FileEntry was not present for file {}", updateRequest.getFileName());
+                return;
+            }
+            oldSize = toUpdate.getSize();
+            toUpdate.setOccupied(updateRequest.isOccupied());
+            toUpdate.setSize(updateRequest.getSize());
+            
+            if (myFreeSpace >= updateRequest.getSize() - oldSize){
+                myFreeSpace -= updateRequest.getSize() - oldSize;
                 
                 //tell the cluster the updated size
                 myClusterListener.tell(new SendFreeSpaceSpread(myFreeSpace), getSelf());
-                
-                FileElement toUpdate = fileTable.getFileElement(updateRequest.getFileName());
-                if(toUpdate == null){
-                    log.error("Fatal error! The FileEntry was not present for file {}",updateRequest.getFileName());
-                    return;
-                }
-                toUpdate.setOccupied(updateRequest.isOccupied());
-                toUpdate.setSize(updateRequest.getSize());
                 permit = true;
             } else {
                 permit = false;
