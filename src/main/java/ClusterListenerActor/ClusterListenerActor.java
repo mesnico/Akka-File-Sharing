@@ -1,5 +1,6 @@
 package ClusterListenerActor;
 
+import Utils.Utilities;
 import ClusterListenerActor.messages.InitiateShutdown;
 import ClusterListenerActor.messages.EndModify;
 import ClusterListenerActor.messages.FileInfoTransfer;
@@ -7,11 +8,12 @@ import ClusterListenerActor.messages.FreeSpaceSpread;
 import ClusterListenerActor.messages.CreationRequest;
 import ClusterListenerActor.messages.UpdateTag;
 import ClusterListenerActor.messages.CreationResponse;
-import ClusterListenerActor.messages.Shutdown;
+import ClusterListenerActor.messages.LeaveAndClose;
 import ClusterListenerActor.messages.SpreadTags;
 import ClusterListenerActor.messages.TagSearchRequest;
 import ClusterListenerActor.messages.TagSearchResponse;
 import FileTransfer.FileTransferActor;
+import FileTransfer.FileTransferSoulReaper;
 import FileTransfer.messages.AuthorizationReply;
 import FileTransfer.messages.EnumAuthorizationReply;
 import FileTransfer.messages.EnumBehavior;
@@ -20,12 +22,11 @@ import FileTransfer.messages.EnumFileModifier;
 import FileTransfer.messages.FileTransferResult;
 import FileTransfer.messages.Handshake;
 import FileTransfer.messages.SendFreeSpaceSpread;
-import FileTransfer.messages.UpdateFileEntry;
 import GUI.messages.SearchRequest;
 import GUI.messages.SendCreationRequest;
 import GUI.messages.SendFileRequest;
-import Startup.AddressResolver;
-import Startup.WatchMe;
+import Utils.AddressResolver;
+import Utils.WatchMe;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
 import akka.actor.Address;
@@ -49,6 +50,7 @@ import com.typesafe.config.Config;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.util.List;
+import java.util.UUID;
 
 /*
  * To change this license header, choose License Headers in Project Properties.
@@ -74,6 +76,7 @@ public class ClusterListenerActor extends UntypedActor {
 
     private final int clusterSystemPort;
     private long myFreeSpace = 0;
+    private long initialFreeSpace;
 
     public ClusterListenerActor() throws Exception {
         this.clusterSystemPort = config.getInt("akka.remote.netty.tcp.port");
@@ -87,6 +90,8 @@ public class ClusterListenerActor extends UntypedActor {
         membersFreeSpace = new FreeSpaceMembersData();
         infoTable = new FileInfoDistributedTable();
         foundFiles = new FoundFiles();
+        
+        initialFreeSpace = config.getLong("app-settings.dedicated-space");
     }
 
     //subscribe to cluster changes
@@ -104,7 +109,7 @@ public class ClusterListenerActor extends UntypedActor {
                 getSelf());
 
         //create the references to the other actors
-        soulReaper = getContext().actorSelection("akka.tcp://ClusterSystem@" + AddressResolver.getMyIpAddress() + ":" + clusterSystemPort + "/user/soulReaper");
+        soulReaper = getContext().actorSelection("akka.tcp://ClusterSystem@" + AddressResolver.getMyIpAddress() + ":" + clusterSystemPort + "/user/mainSoulReaper");
         guiActor = getContext().actorSelection("akka.tcp://ClusterSystem@" + AddressResolver.getMyIpAddress() + ":" + clusterSystemPort + "/user/gui");
         server = getContext().actorSelection("akka.tcp://ClusterSystem@" + AddressResolver.getMyIpAddress() + ":" + clusterSystemPort + "/user/server");
 
@@ -153,12 +158,18 @@ public class ClusterListenerActor extends UntypedActor {
 
         } else if (message instanceof MemberRemoved) {
             MemberRemoved mMemberRemoved = (MemberRemoved) message;
-            log.info("Member is Removed: {}", mMemberRemoved.member());
+            
+            //if I am removed myself from the cluster, then it is time to commit suicide
+            if(mMemberRemoved.member().address().equals(cluster.selfAddress())){
+                getSelf().tell(PoisonPill.getInstance(), getSelf());
+            }
 
             if (mMemberRemoved.previousStatus() == MemberStatus.down()) {
                 //the member was removed because crashed
+                log.info("Member {} is removed because crashed!!", mMemberRemoved.member());
             } else {
                 //the member shutted down gracefully
+                log.info("Member {} left the cluster gracefully", mMemberRemoved.member());
             }
 
             //in any case, the member is removed from the local structure
@@ -227,7 +238,7 @@ public class ClusterListenerActor extends UntypedActor {
                                 InetAddress.getByName(newOwner.address().host().get()),
                                 (int) newOwner.address().port().get(),
                                 new Handshake(EnumBehavior.SEND, fileName)),
-                        "fileTransferAsker");
+                        "fileTransferAsker"+UUID.randomUUID().toString());
                 
                 //don't need to update tags... this is performed at the end of the file send
                 //now we have just to create the file into the FileTable of my server
@@ -271,7 +282,7 @@ public class ClusterListenerActor extends UntypedActor {
                                 InetAddress.getByName(fileOwner.address().host().get()),
                                 (int) fileOwner.address().port().get(),
                                 new Handshake(EnumBehavior.REQUEST, fileRequest.getFileName(), fileRequest.getModifier())),
-                        "fileTransferAsker");
+                        "fileTransferAsker"+UUID.randomUUID().toString());
             }
         
         } else if (message instanceof AuthorizationReply) {
@@ -358,7 +369,22 @@ public class ClusterListenerActor extends UntypedActor {
             log.debug("Current File Info Table: {}", infoTable.toString());
 
         } else if (message instanceof InitiateShutdown) {
+            //create the FileTransfer soul reaper in order to close the server and the cluster listener
+            //only when all the transfers are completed
+            //create the Soul Reaper actor to watch out all the others
+            getContext().actorOf(Props.create(FileTransferSoulReaper.class,server,soulReaper,getSelf()), "fileTransferSoulReaper");
+            
             log.info("The system is going to shutdown!");
+            
+            //virtually remove myself from the priority queue putting a very low size
+            myFreeSpace = -initialFreeSpace;
+            FreeSpaceSpread veryLowSpace = new FreeSpaceSpread(myFreeSpace);
+            mediator.tell(new DistributedPubSubMediator.Publish("freeSpaceTopic", veryLowSpace),
+                    getSelf());
+            
+            server.tell(new InitiateShutdown(), getSelf());
+        
+        } else if (message instanceof LeaveAndClose) {
             //transfer all my infos to my successor node
             Member newInfoResponsable = membersMap.getSuccessorMemberById(
                     Utilities.computeId(Utilities.getAddress(getSelf().path().address(), clusterSystemPort)));
@@ -368,15 +394,8 @@ public class ClusterListenerActor extends UntypedActor {
             //send the infos to the new responsible
             getContext().actorSelection(newInfoResponsable.address() + "/user/clusterListener")
                     .tell(fit, getSelf());
-
-            getSelf().tell(new Shutdown(), getSelf());
-
-        } else if (message instanceof Shutdown) {
-            // --- Leave the cluster and stop the system. Then stop all needed actors, myself too
+            
             cluster.leave(cluster.selfAddress());
-
-            server.tell(PoisonPill.getInstance(), getSelf());
-            getSelf().tell(PoisonPill.getInstance(), getSelf());
 
         } else if (message instanceof MemberEvent) {
             // ignore

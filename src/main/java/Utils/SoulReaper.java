@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package Startup;
+package Utils;
 
 import akka.actor.ActorRef;
 import akka.actor.Terminated;
@@ -17,9 +17,11 @@ import java.util.List;
  *
  * @author nicky
  */
-public class SoulReaper extends UntypedActor{
+abstract public class SoulReaper extends UntypedActor{
     List<ActorRef> watchedActors = new ArrayList<>(5);
     LoggingAdapter log = Logging.getLogger(getContext().system(), this);
+    
+    public abstract void allSoulsReaped();
     
     @Override
     public void onReceive(Object message){
@@ -33,8 +35,7 @@ public class SoulReaper extends UntypedActor{
             log.info("Actor {} is shutted down",getSender());
             watchedActors.remove(getSender());
             if(watchedActors.isEmpty()){
-                //terminate the system
-                getContext().system().terminate();
+                allSoulsReaped();
             }
         }
     }

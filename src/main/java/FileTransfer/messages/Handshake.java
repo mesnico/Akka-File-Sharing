@@ -47,5 +47,10 @@ public class Handshake implements Serializable {
     
     public void setBehavior(EnumBehavior behavior){
         this.behavior = behavior;
-    }    
+    }
+
+    @Override
+    public String toString(){
+        return fileName+" in "+modifier+": "+behavior;
+    }
 }

@@ -1,6 +1,8 @@
 package Startup;
 
 
+import Utils.AddressResolver;
+import Utils.SoulReaper;
 import ClusterListenerActor.ClusterListenerActor;
 import FileTransfer.Server;
 import akka.actor.ActorSystem;
@@ -46,7 +48,7 @@ public class Main {
         //ActorSystem localSystem = ActorSystem.create("LocalSystem", localConf);
         
         //create the Soul Reaper actor to watch out all the others
-        clusterSystem.actorOf(Props.create(SoulReaper.class), "soulReaper");
+        clusterSystem.actorOf(Props.create(MainSoulReaper.class), "mainSoulReaper");
         
         //create the fileTransfer server
         clusterSystem.actorOf(Props.create(Server.class), "server");

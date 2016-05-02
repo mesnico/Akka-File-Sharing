@@ -3,9 +3,8 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package ClusterListenerActor;
+package Utils;
 
-import Startup.AddressResolver;
 import akka.actor.Address;
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;

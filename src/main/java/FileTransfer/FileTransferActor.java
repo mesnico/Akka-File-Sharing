@@ -16,8 +16,8 @@ import FileTransfer.messages.EnumEnding;
 import FileTransfer.messages.EnumFileModifier;
 import FileTransfer.messages.Hello;
 import FileTransfer.messages.SimpleAnswer;
-import Startup.AddressResolver;
-import Startup.WatchMe;
+import Utils.AddressResolver;
+import Utils.WatchMe;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
 import akka.actor.PoisonPill;
@@ -51,7 +51,7 @@ public class FileTransferActor extends UntypedActor {
     private ActorSelection myServer;
     private ActorSelection remoteServer;
     private ActorSelection myGuiActor;
-    private ActorSelection soulReaper;
+    private ActorSelection soulReaper, fileTransferSoulReaper;
     private ActorRef interlocutor;
     private ActorRef connectionHandler;
     private Handshake handshake;
@@ -65,6 +65,7 @@ public class FileTransferActor extends UntypedActor {
     private String filePath;
     private String tmpFilePath = System.getProperty("java.io.tmpdir");
     private boolean fileOccupiedByMe;
+    private String remoteActorName;
 
     // ---------------------- //
     // ---- CONSTRUCTORS ---- //
@@ -95,10 +96,11 @@ public class FileTransferActor extends UntypedActor {
     // --- Constructor called by the responder. The handshake variabile is also used to distinguish
     // --- which part of the code the FileTransferActor has to execute (see preStart)
     public FileTransferActor(InetAddress askerIp, int remoteClusterSystemPort,
-            ActorRef connectionHandler) {
+            String remoteActorName, ActorRef connectionHandler) {
         this(remoteClusterSystemPort);
         handshake = new Handshake(EnumBehavior.UNINITIALIZED);
         this.interlocutorIp = askerIp;
+        this.remoteActorName = remoteActorName;
         this.connectionHandler = connectionHandler;
         log.debug("Interlocutor IP is {}", askerIp.getHostAddress());
     }
@@ -128,14 +130,17 @@ public class FileTransferActor extends UntypedActor {
         myServer = getContext().actorSelection("akka.tcp://ClusterSystem@" + AddressResolver.getMyIpAddress() + ":"
                 + localClusterSystemPort + "/user/server");
         soulReaper = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"
-                +localClusterSystemPort+"/user/soulReaper");
+                +localClusterSystemPort+"/user/mainSoulReaper");
+        fileTransferSoulReaper = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"
+                +localClusterSystemPort+"/user/clusterListener/fileTransferSoulReaper");
         // TODO: check if this reference is needed by both behavior
         myClusterListener = getContext().actorSelection("akka.tcp://ClusterSystem@" + AddressResolver.getMyIpAddress() + ":"
                 + localClusterSystemPort + "/user/clusterListener");
         myGuiActor = getContext().actorSelection("akka.tcp://ClusterSystem@" + AddressResolver.getMyIpAddress() + ":"
                 + localClusterSystemPort + "/user/gui");
         log.debug("My server's name is {} ", myServer);
-        soulReaper.tell(new WatchMe(), getSelf());
+        //soulReaper.tell(new WatchMe(), getSelf());
+        fileTransferSoulReaper.tell(new WatchMe(), getSelf());
 
         switch (handshake.getBehavior()) {
             case SEND:
@@ -152,7 +157,7 @@ public class FileTransferActor extends UntypedActor {
                 // --- I am the responder, I was spawned by my server for handling an
                 // --- incoming connection. I'll ack the asker peer just to let him know my address
                 ActorSelection interlocutorSelection = getContext().actorSelection("akka.tcp://ClusterSystem@" + interlocutorIp.getHostAddress() + ":"
-                        + remoteClusterSystemPort + "/user/clusterListener/fileTransferAsker");
+                        + remoteClusterSystemPort + "/user/clusterListener/"+remoteActorName);
                 FiniteDuration timeout = new FiniteDuration(10, SECONDS);
 
                 interlocutor = Await.result(interlocutorSelection.resolveOne(timeout), timeout);
@@ -208,7 +213,7 @@ public class FileTransferActor extends UntypedActor {
                 handshake.setBehavior(EnumBehavior.SEND);
             }
             changeBehavior();
-            log.debug("Handshake message received");
+            log.debug("Handshake message received: {}",handshake);
         }
     }
 

@@ -7,11 +7,11 @@ package FileTransfer;
 
 import FileTransfer.messages.EnumFileModifier;
 import FileTransfer.messages.AuthorizationReply;
-import FileTransfer.messages.EnumEnding;
 import FileTransfer.messages.EnumAuthorizationReply;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map.Entry;
+import java.util.Set;
 
 /**
  *
@@ -111,11 +111,9 @@ public class FileTable {
         return fileTable.get(fileName);
     }
     
-    /*
-    public long getFileSize(String fileName){
-        return fileTable.get(fileName).getSize();
+    public Set<Entry<String,FileElement>> asSet(){
+        return fileTable.entrySet();
     }
-    */
     
     @Override
     public String toString(){

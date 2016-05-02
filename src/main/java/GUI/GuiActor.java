@@ -5,7 +5,7 @@
  */
 package GUI;
 
-import ClusterListenerActor.Utilities;
+import Utils.Utilities;
 import ClusterListenerActor.messages.CreationResponse;
 import ClusterListenerActor.messages.EndModify;
 import ClusterListenerActor.messages.SpreadTags;
@@ -14,8 +14,8 @@ import FileTransfer.messages.AllocationRequest;
 import FileTransfer.messages.EnumFileModifier;
 import FileTransfer.messages.FileTransferResult;
 import FileTransfer.messages.SimpleAnswer;
-import Startup.AddressResolver;
-import Startup.WatchMe;
+import Utils.AddressResolver;
+import Utils.WatchMe;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
 import akka.actor.UntypedActor;
@@ -90,7 +90,7 @@ public class GuiActor extends UntypedActor {
     public void preStart() throws Exception {
         guiActorRef = getSelf();
         clusterListenerActorRef = getContext().actorSelection("akka.tcp://ClusterSystem@" + AddressResolver.getMyIpAddress() + ":" + clusterSystemPort + "/user/clusterListener");
-        soulReaper = getContext().actorSelection("akka.tcp://ClusterSystem@" + AddressResolver.getMyIpAddress() + ":" + clusterSystemPort + "/user/soulReaper");
+        soulReaper = getContext().actorSelection("akka.tcp://ClusterSystem@" + AddressResolver.getMyIpAddress() + ":" + clusterSystemPort + "/user/mainSoulReaper");
         server = getContext().actorSelection("akka.tcp://ClusterSystem@" + AddressResolver.getMyIpAddress() + ":" + clusterSystemPort + "/user/server");
 
         //subscrive to to the soul reaper

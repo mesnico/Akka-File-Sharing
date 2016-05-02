@@ -9,7 +9,10 @@
 
 package FileTransfer;
 
-import ClusterListenerActor.Utilities;
+import Utils.Utilities;
+import ClusterListenerActor.messages.EndModify;
+import ClusterListenerActor.messages.InitiateShutdown;
+import ClusterListenerActor.messages.LeaveAndClose;
 import ClusterListenerActor.messages.SpreadTags;
 import FileTransfer.messages.AllocationRequest;
 import FileTransfer.messages.AuthorizationReply;
@@ -20,13 +23,15 @@ import FileTransfer.messages.Hello;
 import FileTransfer.messages.SendFreeSpaceSpread;
 import FileTransfer.messages.SimpleAnswer;
 import FileTransfer.messages.UpdateFileEntry;
-import Startup.AddressResolver;
-import Startup.WatchMe;
+import Utils.AddressResolver;
+import Utils.WatchMe;
 import java.net.InetSocketAddress;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
+import akka.actor.PoisonPill;
 import akka.actor.Props;
 import akka.actor.UntypedActor;
+import akka.actor.UntypedActorWithStash;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import akka.io.Tcp;
@@ -34,12 +39,14 @@ import akka.io.Tcp.Bound;
 import akka.io.Tcp.CommandFailed;
 import akka.io.Tcp.Connected;
 import akka.io.TcpMessage;
+import akka.japi.Procedure;
 import com.typesafe.config.Config;
 import java.io.File;
 import java.util.HashMap;
+import java.util.Map.Entry;
 
 
-public class Server extends UntypedActor {
+public class Server extends UntypedActorWithStash {
     private LoggingAdapter log = Logging.getLogger(getContext().system(), this);
     private Config config = getContext().system().settings().config();
     private long myFreeSpace;
@@ -47,21 +54,20 @@ public class Server extends UntypedActor {
     private ActorSelection myGuiActor;    
     private final FileTable fileTable;
     private int localClusterSystemPort;
-    private int remoteClusterSystemPort;
     private int tcpPort;
     private final String filePath;
     private final String tmpFilePath = System.getProperty("java.io.tmpdir");
-    private HashMap<String, Integer> addressTable;
-    private ActorSelection soulReaper;
+    private ActorSelection soulReaper, fileTransferSoulReaper;
+    private long initialFreeSpace;
     
     public Server() {
         filePath = config.getString("app-settings.file-path");
         myFreeSpace = config.getLong("app-settings.dedicated-space");
+        initialFreeSpace = myFreeSpace;
         tcpPort = config.getInt("app-settings.server-port");
         localClusterSystemPort = config.getInt("akka.remote.netty.tcp.port");
         System.out.println(filePath+"--"+myFreeSpace+"--"+tcpPort);
         fileTable = new FileTable();
-        addressTable = new HashMap<>();
     }
     
     // ----------------------------- //
@@ -99,7 +105,9 @@ public class Server extends UntypedActor {
         myClusterListener = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"
                 +localClusterSystemPort+"/user/clusterListener");
         soulReaper = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"
-                +localClusterSystemPort+"/user/soulReaper");
+                +localClusterSystemPort+"/user/mainSoulReaper");
+        fileTransferSoulReaper = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"
+                +localClusterSystemPort+"/user/clusterListener/fileTransferSoulReaper");
         myGuiActor = getContext().actorSelection("akka.tcp://ClusterSystem@"+AddressResolver.getMyIpAddress()+":"
                 +localClusterSystemPort+"/user/gui"); 
         // TODO: the server, at boot time, has to read from the fileTable stored on disk
@@ -129,33 +137,19 @@ public class Server extends UntypedActor {
             Hello hello = (Hello) msg;
             // --- the addressTable is used for concurrency purposes among different client
             // --- requests
-            addressTable.put(hello.getIpAddress(), hello.getPort());
             Hello newHello = new Hello(AddressResolver.getMyIpAddress(), tcpPort);
             getSender().tell(newHello, getSelf());
+            
+            unstashAll();
+            getContext().become(waitingForConnection(hello.getPort(),getSender().path().name()),false);
+            
         } else if (msg instanceof CommandFailed) {
             getContext().stop(getSelf()); //in this case we may bring down the application (bind failed)
-        } else if (msg instanceof Connected) {
-            Connected conn = (Connected) msg;
-            InetSocketAddress remoteAddress = conn.remoteAddress();
             
-            Integer lookupPort = addressTable.remove(remoteAddress.getAddress().getHostAddress());
-            if(lookupPort == null){
-                log.error("Error while looking up the address table for address {}",remoteAddress);
-            }
-            remoteClusterSystemPort = lookupPort;
-            //myClusterListener.tell(conn, getSelf()); //Are we interested in this? (a client connected to us)
-            
-            
-            final ActorRef handler = getContext().actorOf(Props.create(FileTransferActor.class, 
-                    remoteAddress.getAddress(), remoteClusterSystemPort, getSender()));
-            getSender().tell(TcpMessage.register(handler), getSelf());
-            log.debug("I, the server, have received a connection request and I've accepted it");
-        }
-        
         // ---------------------------- //
         // ---- ALLOCATION REQUEST ---- //
         // ---------------------------- //
-        else if (msg instanceof AllocationRequest){
+        } else if (msg instanceof AllocationRequest){
             //log.debug("An allocationRequest arrived, with ");
             AllocationRequest request = (AllocationRequest)msg;
             
@@ -306,11 +300,53 @@ public class Server extends UntypedActor {
                     }
                     break;                
             }
+            
+        } else if (msg instanceof InitiateShutdown){
+            //virtually remove myself from the priority queue putting a very low size
+            myFreeSpace = -initialFreeSpace;
+            
+            //send as many messages as entries in the FileTable to tell the cluster listener to spread all my files
+            //away in the cluster
+            
+            for(Entry<String,FileElement> e : fileTable.asSet()){
+                EndModify spreadMessage = new EndModify(e.getKey(),e.getValue().getSize());
+                myClusterListener.tell(spreadMessage, getSelf());
+            }
+            
+            //if no entries in the table I can kill all the remaining actors. Otherwise the
+            //fileTransferSoulReaper has to wait for the termination of the server and clusterListener
+            if(fileTable.asSet().isEmpty()){
+                fileTransferSoulReaper.tell(PoisonPill.getInstance(), getSelf());
+                myClusterListener.tell(new LeaveAndClose(), getSelf());
+                getSelf().tell(PoisonPill.getInstance(), getSelf());
+            }
+            
+        } else {
+            stash();
         }
-    }    
+    }
+
+    private Procedure<Object> waitingForConnection(int remoteClusterSystemPort, String remoteActorName) {
+        return new Procedure<Object>(){
+        
+            @Override
+            public void apply(Object msg) throws Exception {
+                if (msg instanceof Connected) {
+                    Connected conn = (Connected) msg;
+                    InetSocketAddress remoteAddress = conn.remoteAddress();
+                    //myClusterListener.tell(conn, getSelf()); //Are we interested in this? (a client connected to us)
+
+                    final ActorRef handler = getContext().actorOf(Props.create(FileTransferActor.class,
+                            remoteAddress.getAddress(), remoteClusterSystemPort, remoteActorName, getSender()));
+                    getSender().tell(TcpMessage.register(handler), getSelf());
+                    log.debug("I, the server, have received a connection request and I've accepted it");
+                    unstashAll();
+                    getContext().unbecome();
+                } else {
+                    stash();
+                }
+            }
+        };
+    }
 }
-
-
-
-
 
