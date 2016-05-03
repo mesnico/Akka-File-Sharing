@@ -19,18 +19,11 @@ import akka.actor.PoisonPill;
  */
 public class FileTransferSoulReaper extends SoulReaper{
     private ActorSelection server;
-    private ActorSelection mainSoulReaper;
     private ActorRef clusterListener;
 
-    public FileTransferSoulReaper(ActorSelection server, ActorSelection mainSoulReaper, ActorRef clusterListener) {
+    public FileTransferSoulReaper(ActorSelection server, ActorRef clusterListener) {
         this.server = server;
         this.clusterListener = clusterListener;
-        this.mainSoulReaper = mainSoulReaper;
-    }
-    
-    @Override
-    public void preStart(){
-        mainSoulReaper.tell(new WatchMe(), getSelf());
     }
     
     @Override

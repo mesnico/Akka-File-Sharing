@@ -372,7 +372,7 @@ public class ClusterListenerActor extends UntypedActor {
             //create the FileTransfer soul reaper in order to close the server and the cluster listener
             //only when all the transfers are completed
             //create the Soul Reaper actor to watch out all the others
-            getContext().actorOf(Props.create(FileTransferSoulReaper.class,server,soulReaper,getSelf()), "fileTransferSoulReaper");
+            getContext().actorOf(Props.create(FileTransferSoulReaper.class,server,getSelf()), "fileTransferSoulReaper");
             
             log.info("The system is going to shutdown!");
             

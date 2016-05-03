@@ -316,7 +316,6 @@ public class Server extends UntypedActorWithStash {
             //if no entries in the table I can kill all the remaining actors. Otherwise the
             //fileTransferSoulReaper has to wait for the termination of the server and clusterListener
             if(fileTable.asSet().isEmpty()){
-                fileTransferSoulReaper.tell(PoisonPill.getInstance(), getSelf());
                 myClusterListener.tell(new LeaveAndClose(), getSelf());
                 getSelf().tell(PoisonPill.getInstance(), getSelf());
             }
