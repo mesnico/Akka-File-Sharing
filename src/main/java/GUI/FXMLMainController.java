@@ -64,7 +64,7 @@ public class FXMLMainController implements Initializable {
         if (row != null) {
             System.out.println(row);
             GUI.OpenedFile.set(row.getFileName());
-            //GuiActor.getClusterListenerActorRef().tell(new SendModifyRequest(row.getName(), row.getOwner(), FileModifier.READ), GuiActor.getGuiActorRef());
+            GuiActor.getClusterListenerActorRef().tell(new SendFileRequest(row.getFileName(), row.getOwner(), EnumFileModifier.READ), GuiActor.getGuiActorRef());
 
             //receive it if not busy
         } else {

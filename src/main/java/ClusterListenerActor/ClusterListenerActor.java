@@ -225,6 +225,13 @@ public class ClusterListenerActor extends UntypedActor {
             BigInteger newOwnerId = membersFreeSpace.getHighestFreeSpaceMember();
             log.debug("The chosen one for taking care of {} is {}",fileName,newOwnerId);
             Member newOwner = membersMap.getMemberById(newOwnerId);
+            
+            //if the member with higher free space has a negative free space, it means that all nodes are quitting,
+            //so it's useless to distribute the files I own. I kill all.
+            if(membersFreeSpace.getHighestFreeSpace()<0){
+                server.tell(PoisonPill.getInstance(), getSelf());
+                getSelf().tell(new LeaveAndClose(), mediator);
+            }
 
             //check if i'm the choosen by the load distribution
             if (newOwnerId.equals(Utilities.computeId(Utilities.getAddress(getSelf().path().address(), clusterSystemPort)))) {
@@ -248,20 +255,30 @@ public class ClusterListenerActor extends UntypedActor {
             //used from the EndModify and end of file transfer
 
             SpreadTags msg = (SpreadTags) message;
+            Member responsible;
             for (String tag : msg.getTags()) {
-                Member responsible = membersMap.getResponsibleMemberById(Utilities.computeId(tag));
+                //If the member where i'm going to put the tag is closing, then I put the tag on its successor
+                responsible = getNonClosingResponsable(tag);
                 getContext().actorSelection(responsible.address() + "/user/clusterListener")
                         .tell(new UpdateTag(tag, msg.getFileName(), msg.getOwnerId()), getSelf());
             }
 
             //Also the file name information has to be stored as like as other tags
-            Member responsible = membersMap.getResponsibleMemberById(Utilities.computeId(msg.getFileName()));
+            responsible = getNonClosingResponsable(msg.getFileName());
             getContext().actorSelection(responsible.address() + "/user/clusterListener")
                     .tell(new UpdateTag(msg.getFileName(), msg.getFileName(), msg.getOwnerId()), getSelf());
 
         } else if (message instanceof SendFileRequest) {
             SendFileRequest fileRequest = (SendFileRequest) message;
             Member fileOwner = membersMap.getMemberById(fileRequest.getOwnerId());
+            
+            if(fileOwner == null){
+                log.warning("The file {} cannot be transferred! The owner is falled",fileRequest.getFileName());
+                FileTransferResult transferResult = new FileTransferResult(
+                        EnumEnding.FILE_TO_RECEIVE_NOT_EXISTS,fileRequest.getFileName(),fileRequest.getModifier());
+                guiActor.tell(transferResult, getSelf());
+                return;
+            }
 
             //check if the owner is myself
             if (Utilities.computeId(Utilities.getAddress(fileOwner.address(), clusterSystemPort))
@@ -376,15 +393,6 @@ public class ClusterListenerActor extends UntypedActor {
             
             log.info("The system is going to shutdown!");
             
-            //virtually remove myself from the priority queue putting a very low size
-            myFreeSpace = -initialFreeSpace;
-            FreeSpaceSpread veryLowSpace = new FreeSpaceSpread(myFreeSpace);
-            mediator.tell(new DistributedPubSubMediator.Publish("freeSpaceTopic", veryLowSpace),
-                    getSelf());
-            
-            server.tell(new InitiateShutdown(), getSelf());
-        
-        } else if (message instanceof LeaveAndClose) {
             //transfer all my infos to my successor node
             Member newInfoResponsable = membersMap.getSuccessorMemberById(
                     Utilities.computeId(Utilities.getAddress(getSelf().path().address(), clusterSystemPort)));
@@ -395,6 +403,16 @@ public class ClusterListenerActor extends UntypedActor {
             getContext().actorSelection(newInfoResponsable.address() + "/user/clusterListener")
                     .tell(fit, getSelf());
             
+            //virtually remove myself from the priority queue putting a very low size
+            myFreeSpace = -initialFreeSpace;
+            FreeSpaceSpread veryLowSpace = new FreeSpaceSpread(myFreeSpace);
+            mediator.tell(new DistributedPubSubMediator.Publish("freeSpaceTopic", veryLowSpace),
+                    getSelf());
+            
+            server.tell(new InitiateShutdown(), getSelf());
+        
+        } else if (message instanceof LeaveAndClose) {
+            
             cluster.leave(cluster.selfAddress());
 
         } else if (message instanceof MemberEvent) {
@@ -403,5 +421,16 @@ public class ClusterListenerActor extends UntypedActor {
         } else {
             unhandled(message);
         }
+    }
+    
+    private Member getNonClosingResponsable(String tag){
+        Member nonClosingResponsable;
+        BigInteger realResponsible = membersMap.getResponsibleById(Utilities.computeId(tag));
+        if (membersFreeSpace.getFreeSpaceElement(realResponsible).freeByteSpace < 0) {
+            nonClosingResponsable = membersMap.getSuccessorMemberById(realResponsible);
+        } else {
+            nonClosingResponsable = membersMap.getResponsibleMemberById(realResponsible);
+        }
+        return nonClosingResponsable;
     }
 }

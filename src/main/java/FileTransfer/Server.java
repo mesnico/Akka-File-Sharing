@@ -169,7 +169,8 @@ public class Server extends UntypedActorWithStash {
                             request.getTags());
                     if(fileTable.createOrUpdateEntry(request.getFileName(), newElement)==false){
                         log.warning("Someone tried to send me the file {} I already own", request.getFileName());
-                    }                
+                    }
+                    myClusterListener.tell(new SendFreeSpaceSpread(myFreeSpace), getSelf());
                     getSender().tell(new SimpleAnswer(true), getSelf());
                     log.debug("Received AllocationRequest. Sending out the response: true");
                 } else {
@@ -300,6 +301,13 @@ public class Server extends UntypedActorWithStash {
                     }
                     break;                
             }
+            
+        /*} else if (msg instanceof RegenerateInfosFromFiles){
+            RegenerateInfosFromFiles regenerateMessage = (RegenerateInfosFromFiles)msg;
+            for(Entry<String,FileElement> e : fileTable.asSet()){
+                
+            }
+           */ 
             
         } else if (msg instanceof InitiateShutdown){
             //virtually remove myself from the priority queue putting a very low size

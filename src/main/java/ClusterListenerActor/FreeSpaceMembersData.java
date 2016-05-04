@@ -56,7 +56,7 @@ public class FreeSpaceMembersData {
     }
     
     //Find a member by memberId
-    private FreeSpaceElement existsMember(BigInteger memberId){
+    public FreeSpaceElement getFreeSpaceElement(BigInteger memberId){
         for(FreeSpaceElement e : freeSpace)
             if(e.getMemberID().equals(memberId)){
                 return e;
@@ -77,7 +77,7 @@ public class FreeSpaceMembersData {
     
     //Find the entry corresponding to the member id passed as parameter
     public boolean deleteByMember(BigInteger memberId){
-        FreeSpaceElement toRemove = existsMember(memberId);
+        FreeSpaceElement toRemove = getFreeSpaceElement(memberId);
         return freeSpace.remove(toRemove);
     }
     
@@ -85,7 +85,7 @@ public class FreeSpaceMembersData {
     //If the member is not present, it is created and returns false
     //otherwise, it returns true
     public boolean updateMemberFreeSpace(BigInteger memberId, long newSpace){
-        FreeSpaceElement element = existsMember(memberId);
+        FreeSpaceElement element = getFreeSpaceElement(memberId);
         if(element == null){
             freeSpace.add(new FreeSpaceElement(memberId,newSpace));
             return false;

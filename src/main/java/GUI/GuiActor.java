@@ -183,12 +183,15 @@ public class GuiActor extends UntypedActor {
                         break;
 
                     case FILE_RECEIVING_FAILED:
+                    case FILE_TO_RECEIVE_NOT_EXISTS:
+                    case FILE_TO_RECEIVE_BUSY:
                         Alert alert = new Alert(Alert.AlertType.ERROR);
                         alert.setTitle("Error");
-                        alert.setHeaderText("Reciving Failed");
-                        alert.setContentText("An error occurred during file transfer!");
+                        alert.setHeaderText("Receiving Failed");
+                        alert.setContentText("An error occurred during file transfer!: "+ftr.getMessageType().toString());
 
                         alert.showAndWait();
+                        GUI.OpenedFile.unset();
                         break;
 
                     //following case handles progress bars during load balancing...
