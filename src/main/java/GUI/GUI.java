@@ -74,9 +74,7 @@ public class GUI extends Application {
         stage.setOnCloseRequest((WindowEvent we) -> {
             //tell the cluster system to initiate the shutdown
             GuiActor.getClusterListenerActorRef().tell(new ClusterListenerActor.messages.InitiateShutdown(), GuiActor.getGuiActorRef());
-            
-            //send Poison Pill to me to kill myself
-            GuiActor.getGuiActorRef().tell(PoisonPill.getInstance(), GuiActor.getGuiActorRef());
+            we.consume();
         });
         
     }

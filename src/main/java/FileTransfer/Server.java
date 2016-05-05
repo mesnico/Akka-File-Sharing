@@ -28,9 +28,9 @@ import Utils.WatchMe;
 import java.net.InetSocketAddress;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
+import akka.actor.Address;
 import akka.actor.PoisonPill;
 import akka.actor.Props;
-import akka.actor.UntypedActor;
 import akka.actor.UntypedActorWithStash;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
@@ -42,7 +42,10 @@ import akka.io.TcpMessage;
 import akka.japi.Procedure;
 import com.typesafe.config.Config;
 import java.io.File;
-import java.util.HashMap;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.util.Map.Entry;
 
 
@@ -52,7 +55,7 @@ public class Server extends UntypedActorWithStash {
     private long myFreeSpace;
     private ActorSelection myClusterListener;
     private ActorSelection myGuiActor;    
-    private final FileTable fileTable;
+    private FileTable fileTable;
     private int localClusterSystemPort;
     private int tcpPort;
     private final String filePath;
@@ -60,14 +63,16 @@ public class Server extends UntypedActorWithStash {
     private ActorSelection soulReaper, fileTransferSoulReaper;
     private long initialFreeSpace;
     
-    public Server() {
+    public Server() {        
         filePath = config.getString("app-settings.file-path");
         myFreeSpace = config.getLong("app-settings.dedicated-space");
         initialFreeSpace = myFreeSpace;
         tcpPort = config.getInt("app-settings.server-port");
         localClusterSystemPort = config.getInt("akka.remote.netty.tcp.port");
         System.out.println(filePath+"--"+myFreeSpace+"--"+tcpPort);
-        fileTable = new FileTable();
+        
+        fileTable = retrieveFileTable();
+        myFreeSpace -= fileTable.getTotalOccupiedSpace();
     }
     
     // ----------------------------- //
@@ -158,7 +163,7 @@ public class Server extends UntypedActorWithStash {
                 FileElement newElement = new FileElement(occupied, request.getSize(),
                         request.getTags());
                 if(fileTable.createOrUpdateEntry(request.getFileName(), newElement)==false){
-                    log.warning("Someone tried to send me the file {} I already own", request.getFileName());
+                    log.error("Someone tried to send me the file {} I already own", request.getFileName());
                 }
                 log.debug("Received AllocationRequest. The size was 0 so no SimpleAnswer is sent back");
             } else {
@@ -168,7 +173,7 @@ public class Server extends UntypedActorWithStash {
                     FileElement newElement = new FileElement(occupied, request.getSize(),
                             request.getTags());
                     if(fileTable.createOrUpdateEntry(request.getFileName(), newElement)==false){
-                        log.warning("Someone tried to send me the file {} I already own", request.getFileName());
+                        log.error("Someone tried to send me the file {} I already own", request.getFileName());
                     }
                     myClusterListener.tell(new SendFreeSpaceSpread(myFreeSpace), getSelf());
                     getSender().tell(new SimpleAnswer(true), getSelf());
@@ -354,6 +359,26 @@ public class Server extends UntypedActorWithStash {
                 }
             }
         };
+    }
+    
+    private FileTable retrieveFileTable(){
+        FileTable fileTable;
+        try{
+            FileInputStream fin = new FileInputStream(filePath + "fileTable.ser");
+            ObjectInputStream ois = new ObjectInputStream(fin);
+            fileTable = (FileTable) ois.readObject();
+            log.info("fileTable found on disk. It is loaded");
+            
+            ois.close();
+            fin.close();
+        } catch(FileNotFoundException e){
+            log.info("FileTable not found on disk. It is created just now");
+            fileTable = new FileTable(filePath);
+        } catch(Exception e){
+            log.error("Cannot do I/O on serialized fileTable: {}",e.getMessage());
+            fileTable = new FileTable(filePath);
+        }
+        return fileTable;
     }
 }
 

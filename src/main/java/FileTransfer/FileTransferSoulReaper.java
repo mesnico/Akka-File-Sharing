@@ -6,6 +6,7 @@
 package FileTransfer;
 
 import ClusterListenerActor.messages.LeaveAndClose;
+import GUI.messages.ProgressUpdate;
 import Utils.AddressResolver;
 import Utils.SoulReaper;
 import Utils.WatchMe;
@@ -19,10 +20,12 @@ import akka.actor.PoisonPill;
  */
 public class FileTransferSoulReaper extends SoulReaper{
     private ActorSelection server;
+    private ActorSelection gui;
     private ActorRef clusterListener;
 
-    public FileTransferSoulReaper(ActorSelection server, ActorRef clusterListener) {
+    public FileTransferSoulReaper(ActorSelection server, ActorSelection gui, ActorRef clusterListener) {
         this.server = server;
+        this.gui = gui;
         this.clusterListener = clusterListener;
     }
     
@@ -30,5 +33,10 @@ public class FileTransferSoulReaper extends SoulReaper{
     public void allSoulsReaped(){
         server.tell(PoisonPill.getInstance(), getSender());
         clusterListener.tell(new LeaveAndClose(), getSelf());
+    }
+    
+    @Override
+    public void progress(int completion, int total){
+        gui.tell(new ProgressUpdate(completion, total), getSelf());
     }
 }

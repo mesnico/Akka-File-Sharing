@@ -14,10 +14,12 @@ import FileTransfer.messages.AllocationRequest;
 import FileTransfer.messages.EnumFileModifier;
 import FileTransfer.messages.FileTransferResult;
 import FileTransfer.messages.SimpleAnswer;
+import GUI.messages.GuiShutdown;
 import Utils.AddressResolver;
 import Utils.WatchMe;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
+import akka.actor.PoisonPill;
 import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
@@ -27,6 +29,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXMLLoader;
@@ -224,6 +227,9 @@ public class GuiActor extends UntypedActor {
             }            
             GUI.OpenedFile.unset();
             
+        } else if (message instanceof GuiShutdown){
+            getSelf().tell(PoisonPill.getInstance(), getSelf());
+            Platform.exit();
         }
 
         /*

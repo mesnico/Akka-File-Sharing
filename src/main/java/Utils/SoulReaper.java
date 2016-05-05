@@ -20,8 +20,11 @@ import java.util.List;
 abstract public class SoulReaper extends UntypedActor{
     List<ActorRef> watchedActors = new ArrayList<>(5);
     LoggingAdapter log = Logging.getLogger(getContext().system(), this);
+    int totalSize = 0;
     
     public abstract void allSoulsReaped();
+    
+    public void progress(int completion, int total){}
     
     @Override
     public void onReceive(Object message){
@@ -30,10 +33,12 @@ abstract public class SoulReaper extends UntypedActor{
             log.info("I'm watching actor {}",getSender());
             getContext().watch(getSender());
             watchedActors.add(getSender());
+            totalSize++;
         } else if(message instanceof Terminated){
             //some actor dead. I remove it from the list.
             log.info("Actor {} is shutted down",getSender());
             watchedActors.remove(getSender());
+            progress(1-watchedActors.size(),totalSize);
             if(watchedActors.isEmpty()){
                 allSoulsReaped();
             }

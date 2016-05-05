@@ -8,6 +8,11 @@ package FileTransfer;
 import FileTransfer.messages.EnumFileModifier;
 import FileTransfer.messages.AuthorizationReply;
 import FileTransfer.messages.EnumAuthorizationReply;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map.Entry;
@@ -18,7 +23,7 @@ import java.util.Set;
  * @author nicky
  */
 
-class FileElement{
+class FileElement implements Serializable{
     private boolean occupied;
     private long size;
     private List<String> tags;
@@ -50,18 +55,21 @@ class FileElement{
     }
 }
 
-public class FileTable {
+public class FileTable implements Serializable{
     private HashMap<String,FileElement> fileTable;
+    private String filePath;
     
-    public FileTable(){
+    public FileTable(String filePath){
         System.out.println("[fileTable]: fileTable creata");
-         fileTable = new HashMap<String,FileElement>();
+        fileTable = new HashMap<String,FileElement>();
+        this.filePath = filePath;
     }
     
     //returns false if the entry already existed
     //this method replaces the entry if it already existed
     public boolean createOrUpdateEntry(String fileName, FileElement e){
         FileElement old = fileTable.put(fileName, e);
+        serializeToFile();
         if(old==null) return true;
         return false;
     }
@@ -69,6 +77,7 @@ public class FileTable {
     // --- Returns false if the fileName doesn't exists.
     public FileElement deleteEntry(String fileName){
         FileElement e = fileTable.remove(fileName);
+        serializeToFile();
         return e;
     }
     
@@ -76,6 +85,7 @@ public class FileTable {
         FileElement e = fileTable.get(fileName);
         if(e == null) return false;
         fileTable.get(fileName).setOccupied(occupied);
+        serializeToFile();
         return true;
     }
     
@@ -90,6 +100,7 @@ public class FileTable {
             if(readOrWrite == EnumFileModifier.WRITE){
                 System.out.println("[fileTable]: sono nella testAndSet, sto per marcare il file come occupato");
                 fileTable.get(fileName).setOccupied(true);
+                serializeToFile();
             }
             return new AuthorizationReply(
                     fileName,
@@ -118,5 +129,21 @@ public class FileTable {
     @Override
     public String toString(){
         return fileTable.toString();
+    }
+    
+    //serialize to file in order to be reloaded at every time
+    private void serializeToFile(){
+        try{
+            FileOutputStream fout = new FileOutputStream(filePath + "fileTable.ser");
+            ObjectOutputStream oos = new ObjectOutputStream(fout);
+            oos.writeObject(this);
+            
+            oos.close();
+            fout.close();
+        } catch(FileNotFoundException e){
+            System.err.println("Error opening the file fileTable.ser! "+e.getMessage());
+        } catch(IOException e){
+            System.err.println("Error serializing the fileTable to file fileTable.ser! "+e.getMessage());
+        }
     }
 }

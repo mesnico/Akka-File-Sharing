@@ -22,6 +22,7 @@ import FileTransfer.messages.EnumFileModifier;
 import FileTransfer.messages.FileTransferResult;
 import FileTransfer.messages.Handshake;
 import FileTransfer.messages.SendFreeSpaceSpread;
+import GUI.messages.GuiShutdown;
 import GUI.messages.SearchRequest;
 import GUI.messages.SendCreationRequest;
 import GUI.messages.SendFileRequest;
@@ -230,7 +231,7 @@ public class ClusterListenerActor extends UntypedActor {
             //so it's useless to distribute the files I own. I kill all.
             if(membersFreeSpace.getHighestFreeSpace()<0){
                 server.tell(PoisonPill.getInstance(), getSelf());
-                getSelf().tell(new LeaveAndClose(), mediator);
+                getSelf().tell(new LeaveAndClose(), getSelf());
             }
 
             //check if i'm the choosen by the load distribution
@@ -389,7 +390,7 @@ public class ClusterListenerActor extends UntypedActor {
             //create the FileTransfer soul reaper in order to close the server and the cluster listener
             //only when all the transfers are completed
             //create the Soul Reaper actor to watch out all the others
-            getContext().actorOf(Props.create(FileTransferSoulReaper.class,server,getSelf()), "fileTransferSoulReaper");
+            getContext().actorOf(Props.create(FileTransferSoulReaper.class,server,guiActor,getSelf()), "fileTransferSoulReaper");
             
             log.info("The system is going to shutdown!");
             
@@ -412,7 +413,7 @@ public class ClusterListenerActor extends UntypedActor {
             server.tell(new InitiateShutdown(), getSelf());
         
         } else if (message instanceof LeaveAndClose) {
-            
+            guiActor.tell(new GuiShutdown(), getSelf());
             cluster.leave(cluster.selfAddress());
 
         } else if (message instanceof MemberEvent) {
