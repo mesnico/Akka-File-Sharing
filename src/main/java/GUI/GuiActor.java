@@ -15,6 +15,7 @@ import FileTransfer.messages.EnumFileModifier;
 import FileTransfer.messages.FileTransferResult;
 import FileTransfer.messages.SimpleAnswer;
 import GUI.messages.GuiShutdown;
+import GUI.messages.ProgressUpdate;
 import Utils.AddressResolver;
 import Utils.WatchMe;
 import akka.actor.ActorRef;
@@ -36,6 +37,8 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
+import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.stage.WindowEvent;
@@ -230,15 +233,17 @@ public class GuiActor extends UntypedActor {
         } else if (message instanceof GuiShutdown){
             getSelf().tell(PoisonPill.getInstance(), getSelf());
             Platform.exit();
+            
+        } else if (message instanceof ProgressUpdate){
+            ProgressUpdate pu = (ProgressUpdate) message;
+            Label label = (Label) GUI.getSecondaryStage().getScene().lookup("#label");
+            ProgressBar pb = (ProgressBar) GUI.getSecondaryStage().getScene().lookup("#progrBar");
+            double progress = pu.getCompletion()/pu.getTotal();
+            
+            label.setText("Status " + (int)100*progress + "% ("+pu.getCompletion()+"/"+pu.getTotal()+")");
+            pb.setProgress(progress);
+            
         }
-
-        /*
-         if(message instanceof ModifyRequest){
-            
-         }
-         if(message instanceof ReadRequest){
-            
-         }*/
     }
 
     public static ActorRef getGuiActorRef() {
