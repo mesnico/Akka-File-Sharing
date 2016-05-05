@@ -20,7 +20,8 @@ public class AuthorizationReply implements Serializable {
     private List<String> tags;
     private String fileName;
     
-    public AuthorizationReply(EnumAuthorizationReply response){
+    public AuthorizationReply(String fileName, EnumAuthorizationReply response){
+        this.fileName = fileName;
         this.response = response;
     }
     

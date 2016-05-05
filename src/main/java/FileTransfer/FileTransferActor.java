@@ -277,7 +277,7 @@ public class FileTransferActor extends UntypedActor {
                                 // --- open it. I cannot forward the AUTHORIZATION_GRANTED message received
                                 // --- from the server, we have to override it with a FILE_NOT_EXISTS message.
                             } else {
-                                reply = new AuthorizationReply(EnumAuthorizationReply.FILE_NOT_EXISTS);
+                                reply = new AuthorizationReply(handshake.getFileName(), EnumAuthorizationReply.FILE_NOT_EXISTS);
                                 interlocutor.tell(reply, getSelf());
                                 terminate(EnumEnding.FILE_OPENING_FAILED);
                                 log.error("Impossible to open file {}", handshake.getFileName());

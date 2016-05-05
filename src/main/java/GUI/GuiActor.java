@@ -14,6 +14,7 @@ import FileTransfer.messages.AllocationRequest;
 import FileTransfer.messages.EnumFileModifier;
 import FileTransfer.messages.FileTransferResult;
 import FileTransfer.messages.SimpleAnswer;
+import FileTransfer.messages.UpdateFileEntry;
 import GUI.messages.GuiShutdown;
 import GUI.messages.ProgressUpdate;
 import Utils.AddressResolver;
@@ -68,8 +69,9 @@ public class GuiActor extends UntypedActor {
     }
 
     private void startModify(File file) throws IOException {
-        Desktop.getDesktop().edit(file);
         try {
+            Desktop.getDesktop().edit(file);
+            
             FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/fxml/Modify.fxml"));
             Parent root = (Parent) fxmlLoader.load();
             Stage stage = new Stage();
@@ -87,8 +89,14 @@ public class GuiActor extends UntypedActor {
             GUI.getStage().hide();
 
         } catch (IOException ex) {
-            //System.out.println(ex.getMessage());
-            //System.out.println(ex.getCause().toString());
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText("Failed to edit the file");
+            alert.setContentText("The file is not editable!");
+
+            alert.showAndWait();
+            //--- lunch load distribution (EndModify)
+            clusterListenerActorRef.tell(new EndModify(file.getName(), file.length()), getSelf());
         }
     }
 

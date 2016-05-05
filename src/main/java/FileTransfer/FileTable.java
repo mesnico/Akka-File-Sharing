@@ -93,9 +93,9 @@ public class FileTable implements Serializable{
     // --- If it's free, I set it as busy and return also the file's size and tags
     public AuthorizationReply testAndSet(String fileName, EnumFileModifier readOrWrite){
         if(!fileTable.containsKey(fileName)){
-            return new AuthorizationReply(EnumAuthorizationReply.FILE_NOT_EXISTS);
+            return new AuthorizationReply(fileName, EnumAuthorizationReply.FILE_NOT_EXISTS);
         } else if(fileTable.get(fileName).isOccupied()) {
-            return new AuthorizationReply(EnumAuthorizationReply.FILE_BUSY);
+            return new AuthorizationReply(fileName, EnumAuthorizationReply.FILE_BUSY);
         } else {
             if(readOrWrite == EnumFileModifier.WRITE){
                 System.out.println("[fileTable]: sono nella testAndSet, sto per marcare il file come occupato");
