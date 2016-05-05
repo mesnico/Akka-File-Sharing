@@ -162,6 +162,7 @@ public class ClusterListenerActor extends UntypedActor {
             
             //if I am removed myself from the cluster, then it is time to commit suicide
             if(mMemberRemoved.member().address().equals(cluster.selfAddress())){
+                guiActor.tell(new GuiShutdown(), getSelf());
                 getSelf().tell(PoisonPill.getInstance(), getSelf());
             }
 
@@ -413,7 +414,7 @@ public class ClusterListenerActor extends UntypedActor {
             server.tell(new InitiateShutdown(), getSelf());
         
         } else if (message instanceof LeaveAndClose) {
-            guiActor.tell(new GuiShutdown(), getSelf());
+
             cluster.leave(cluster.selfAddress());
 
         } else if (message instanceof MemberEvent) {

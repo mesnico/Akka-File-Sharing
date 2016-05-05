@@ -238,7 +238,7 @@ public class GuiActor extends UntypedActor {
             ProgressUpdate pu = (ProgressUpdate) message;
             Label label = (Label) GUI.getSecondaryStage().getScene().lookup("#label");
             ProgressBar pb = (ProgressBar) GUI.getSecondaryStage().getScene().lookup("#progrBar");
-            double progress = pu.getCompletion()/pu.getTotal();
+            double progress = ((double)pu.getCompletion())/pu.getTotal();
             
             label.setText("Status " + (int)100*progress + "% ("+pu.getCompletion()+"/"+pu.getTotal()+")");
             pb.setProgress(progress);
