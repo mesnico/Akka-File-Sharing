@@ -263,7 +263,7 @@ public class ClusterListenerActor extends UntypedActor {
                 //If the member where i'm going to put the tag is closing, then I put the tag on its successor
                 responsible = getNonClosingResponsable(tag);
                 getContext().actorSelection(responsible.address() + "/user/clusterListener")
-                        .tell(new UpdateTag(tag, msg.getFileName(), msg.getOwnerId()), getSelf());
+                        .tell(new UpdateTag(msg.getFileName(), tag, msg.getOwnerId()), getSelf());
             }
 
             //Also the file name information has to be stored as like as other tags
@@ -376,7 +376,7 @@ public class ClusterListenerActor extends UntypedActor {
         } else if (message instanceof UpdateTag) {
             //Receved a information for wich I'm the responsible
             UpdateTag mAddTag = (UpdateTag) message;
-            infoTable.updateTag(mAddTag.getTag(), mAddTag.getFileName(), mAddTag.getOwnerId());
+            infoTable.updateTag(mAddTag.getFileName(), mAddTag.getTag(), mAddTag.getOwnerId());
             log.info("Received tag: {}", mAddTag.toString());
             log.debug("Current File Info Table: {}", infoTable.toString());
 

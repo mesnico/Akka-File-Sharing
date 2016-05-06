@@ -56,7 +56,7 @@ public class FileInfoDistributedTable {
     
     //This method update the tag if the is was found, and return true;
     //else if the tag wasn't present, it is created and returns false.
-    public boolean updateTag(String tag, String fileName, BigInteger newOwnerId){
+    public boolean updateTag(String fileName, String tag, BigInteger newOwnerId){
         FileInfoElement toUpdate = existsFile(tag,fileName);
         if(toUpdate == null){
             add(tag,fileName,newOwnerId);
