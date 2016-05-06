@@ -14,8 +14,4 @@ import java.io.Serializable;
  * @author nicky
  */
 public class InitiateShutdown implements Serializable{
-
-    public InitiateShutdown() {
-    }
-    
 }

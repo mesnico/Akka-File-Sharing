@@ -1,5 +1,6 @@
 package GUI;
 
+import ClusterListenerActor.messages.InitiateShutdown;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -8,7 +9,6 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
-import javafx.stage.StageStyle;
 import javafx.stage.WindowEvent;
 
 public class GUI extends Application {
@@ -79,7 +79,7 @@ public class GUI extends Application {
         //at the event "close window"
         stage.setOnCloseRequest((WindowEvent we) -> {
             //tell the cluster system to initiate the shutdown
-            GuiActor.getClusterListenerActorRef().tell(new ClusterListenerActor.messages.InitiateShutdown(), GuiActor.getGuiActorRef());
+            GuiActor.getClusterListenerActorRef().tell(new InitiateShutdown(), GuiActor.getGuiActorRef());
             try {
                 FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/fxml/ProgressBar.fxml"));
                 Parent root2 = (Parent) fxmlLoader.load();

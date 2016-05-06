@@ -14,7 +14,6 @@ import FileTransfer.messages.AllocationRequest;
 import FileTransfer.messages.EnumFileModifier;
 import FileTransfer.messages.FileTransferResult;
 import FileTransfer.messages.SimpleAnswer;
-import FileTransfer.messages.UpdateFileEntry;
 import GUI.messages.GuiShutdown;
 import GUI.messages.ProgressUpdate;
 import Utils.AddressResolver;
