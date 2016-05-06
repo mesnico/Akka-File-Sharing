@@ -26,6 +26,7 @@ import GUI.messages.GuiShutdown;
 import GUI.messages.SearchRequest;
 import GUI.messages.SendCreationRequest;
 import GUI.messages.SendFileRequest;
+import GUI.messages.UpdateFreeSpace;
 import Utils.AddressResolver;
 import Utils.WatchMe;
 import akka.actor.ActorRef;
@@ -208,6 +209,9 @@ public class ClusterListenerActor extends UntypedActor {
             // --- keep the freeSpace also in an updated clusterListener variable,
             // --- so that members entering could be immediately notified
             myFreeSpace = freeByteSpace;
+            
+            //tell the GuiActor to update the showing free space
+            guiActor.tell(new UpdateFreeSpace(myFreeSpace), getSelf());
             //tell my free space to all the other cluster nodes
             mediator.tell(new DistributedPubSubMediator.Publish("freeSpaceTopic", new FreeSpaceSpread(freeByteSpace)),
                     getSelf());

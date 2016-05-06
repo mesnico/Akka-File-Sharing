@@ -26,7 +26,9 @@ import javafx.stage.WindowEvent;
 public class FXMLMainController implements Initializable {
 
     @FXML
-    private Label label;
+    private Label fileName;
+    @FXML
+    private Label freeSpaceLabel;
     @FXML
     private TextField search;
     @FXML
@@ -137,7 +139,7 @@ public class FXMLMainController implements Initializable {
     @FXML
     private void search(ActionEvent event) {
         String searchText = search.getText();
-        label.setText(searchText);
+        fileName.setText(searchText);
         if (!searchText.isEmpty()) {
             //empty the table to reset result in case of 0 matches
             //more in detail: TagSearchResponse is not sent to clusterListener, who do not send the (void) list to guiActor

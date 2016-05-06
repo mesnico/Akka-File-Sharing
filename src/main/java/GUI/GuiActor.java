@@ -16,6 +16,7 @@ import FileTransfer.messages.FileTransferResult;
 import FileTransfer.messages.SimpleAnswer;
 import GUI.messages.GuiShutdown;
 import GUI.messages.ProgressUpdate;
+import GUI.messages.UpdateFreeSpace;
 import Utils.AddressResolver;
 import Utils.WatchMe;
 import akka.actor.ActorRef;
@@ -61,6 +62,7 @@ public class GuiActor extends UntypedActor {
         clusterSystemPort = config.getInt("akka.remote.netty.tcp.port");
         filePath = config.getString("app-settings.file-path");
         tmpFilePath = System.getProperty("java.io.tmpdir");
+        getSelf().tell(new UpdateFreeSpace(config.getLong("app-settings.dedicated-space")), getSelf());
     }
 
     public static String getFilePath() {
@@ -236,6 +238,15 @@ public class GuiActor extends UntypedActor {
                   
             }            
             GUI.OpenedFile.unset();
+            
+        } else if (message instanceof UpdateFreeSpace) {
+            UpdateFreeSpace ufs = (UpdateFreeSpace) message;
+            Label l = (Label) GUI.getStage().getScene().lookup("#freeSpaceLabel");
+            String formattedFreeSpace = (ufs.getFreeSpace()%1024 < 0)? ufs.getFreeSpace()+"B":
+                (ufs.getFreeSpace()%(1048576) < 0)? ufs.getFreeSpace()/1024+"KB":
+                (ufs.getFreeSpace()%(1073741824) < 0)? ufs.getFreeSpace()/(1048576)+"MB":
+                ufs.getFreeSpace()/(1073741824)+"GB";
+            l.setText(formattedFreeSpace);
             
         } else if (message instanceof GuiShutdown){
             getSelf().tell(PoisonPill.getInstance(), getSelf());

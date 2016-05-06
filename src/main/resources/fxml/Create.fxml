@@ -24,10 +24,10 @@
             <Label alignment="TOP_LEFT" text="Tags" GridPane.rowIndex="1" GridPane.valignment="TOP" />
             <VBox fx:id="vboxTags" spacing="5.0" GridPane.columnIndex="1" GridPane.rowIndex="1">
                <children>
-                  <TextField fx:id="tag1" alignment="TOP_LEFT" />
-                  <TextField fx:id="tag2" alignment="TOP_LEFT" />
-                  <TextField fx:id="tag3" alignment="TOP_LEFT" />
-                  <TextField fx:id="tag4" alignment="TOP_LEFT" />
+                  <TextField fx:id="tag1" alignment="TOP_LEFT" onAction="#create" />
+                  <TextField fx:id="tag2" alignment="TOP_LEFT" onAction="#create" />
+                  <TextField fx:id="tag3" alignment="TOP_LEFT" onAction="#create" />
+                  <TextField fx:id="tag4" alignment="TOP_LEFT" onAction="#create" />
                </children>
                <padding>
                   <Insets top="5.0" />
