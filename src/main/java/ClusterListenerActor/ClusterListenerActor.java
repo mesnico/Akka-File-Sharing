@@ -151,7 +151,7 @@ public class ClusterListenerActor extends UntypedActor {
             }
 
             //send my free space to the new arrived member
-            getContext().actorSelection(mMemberUp.member().address() + "/user/clusterListener")
+            if(myFreeSpace!=0) getContext().actorSelection(mMemberUp.member().address() + "/user/clusterListener")
                     .tell(new FreeSpaceSpread(myFreeSpace), getSelf());
 
         } else if (message instanceof UnreachableMember) {
@@ -210,11 +210,11 @@ public class ClusterListenerActor extends UntypedActor {
             // --- so that members entering could be immediately notified
             myFreeSpace = freeByteSpace;
             
-            //tell the GuiActor to update the showing free space
-            guiActor.tell(new UpdateFreeSpace(myFreeSpace), getSelf());
             //tell my free space to all the other cluster nodes
             mediator.tell(new DistributedPubSubMediator.Publish("freeSpaceTopic", new FreeSpaceSpread(freeByteSpace)),
                     getSelf());
+            //tell the GuiActor to update the showing free space
+            guiActor.tell(new UpdateFreeSpace(myFreeSpace), getSelf());
 
         } else if (message instanceof FreeSpaceSpread) {
             //insert the received information about the free space in the current priority queue.

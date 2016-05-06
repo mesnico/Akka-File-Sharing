@@ -40,6 +40,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
+import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.stage.WindowEvent;
@@ -242,11 +243,13 @@ public class GuiActor extends UntypedActor {
         } else if (message instanceof UpdateFreeSpace) {
             UpdateFreeSpace ufs = (UpdateFreeSpace) message;
             Label l = (Label) GUI.getStage().getScene().lookup("#freeSpaceLabel");
-            String formattedFreeSpace = (ufs.getFreeSpace()%1024 < 0)? ufs.getFreeSpace()+"B":
-                (ufs.getFreeSpace()%(1048576) < 0)? ufs.getFreeSpace()/1024+"KB":
-                (ufs.getFreeSpace()%(1073741824) < 0)? ufs.getFreeSpace()/(1048576)+"MB":
-                ufs.getFreeSpace()/(1073741824)+"GB";
+            String formattedFreeSpace = (ufs.getFreeSpace()/1024 < 0)? ufs.getFreeSpace()+"B":
+                (ufs.getFreeSpace()/1048576 < 0)? ufs.getFreeSpace()/1024+"KB":
+                (ufs.getFreeSpace()/1073741824 < 0)? ufs.getFreeSpace()/(1048576)+"MB":
+                ufs.getFreeSpace()/1073741824+"GB";
             l.setText(formattedFreeSpace);
+            l.setTextFill(Color.web("#ff0000"));
+            log.debug("update free space: "+formattedFreeSpace);
             
         } else if (message instanceof GuiShutdown){
             getSelf().tell(PoisonPill.getInstance(), getSelf());
