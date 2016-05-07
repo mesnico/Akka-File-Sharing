@@ -31,6 +31,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
+import java.text.DecimalFormat;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -63,7 +64,6 @@ public class GuiActor extends UntypedActor {
         clusterSystemPort = config.getInt("akka.remote.netty.tcp.port");
         filePath = config.getString("app-settings.file-path");
         tmpFilePath = System.getProperty("java.io.tmpdir");
-        getSelf().tell(new UpdateFreeSpace(config.getLong("app-settings.dedicated-space")), getSelf());
     }
 
     public static String getFilePath() {
@@ -242,11 +242,12 @@ public class GuiActor extends UntypedActor {
             
         } else if (message instanceof UpdateFreeSpace) {
             UpdateFreeSpace ufs = (UpdateFreeSpace) message;
+            DecimalFormat df = new DecimalFormat("#.0");
             Label l = (Label) GUI.getStage().getScene().lookup("#freeSpaceLabel");
             String formattedFreeSpace = (ufs.getFreeSpace() < 1024)? ufs.getFreeSpace()+" B":
-                (ufs.getFreeSpace() < 1048576)? ufs.getFreeSpace()/1024+" KiB":
-                (ufs.getFreeSpace() < 1073741824)? ufs.getFreeSpace()/1048576+" MiB":
-                ufs.getFreeSpace()/1073741824+" GiB";
+                (ufs.getFreeSpace() < 1048576)? df.format((double)ufs.getFreeSpace()/1024)+" KiB":
+                (ufs.getFreeSpace() < 1073741824)? df.format((double)ufs.getFreeSpace()/1048576)+" MiB":
+                df.format((double)ufs.getFreeSpace()/1073741824)+" GiB";
             l.setText(formattedFreeSpace);
             l.setTextFill(Color.web("#ff0000"));
             log.debug("update free space: "+formattedFreeSpace);
