@@ -50,7 +50,11 @@ public class FreeSpaceMembersData {
             //the comparator needs to be hacked because I want the highest free space member to be on top of the queue
             @Override
             public int compare(FreeSpaceElement o1, FreeSpaceElement o2){
-                return (int)(o2.getFreeByteSpace() - o1.getFreeByteSpace());
+                int result;
+                result = o2.getFreeByteSpace() > o1.getFreeByteSpace() ? 1 : 
+                         o2.getFreeByteSpace() < o1.getFreeByteSpace() ? -1 :
+                         0;
+                return result;
             }
         });
     }
