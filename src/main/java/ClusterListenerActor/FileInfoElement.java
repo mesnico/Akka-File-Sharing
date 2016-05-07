@@ -7,6 +7,7 @@ package ClusterListenerActor;
 
 import java.io.Serializable;
 import java.math.BigInteger;
+import java.util.Objects;
 
 /**
  *
@@ -31,6 +32,20 @@ public class FileInfoElement implements Serializable{
 
     public void setOwnerId(BigInteger ownerId) {
         this.ownerId = ownerId;
+    }
+    
+    @Override
+    public boolean equals(Object obj){
+        FileInfoElement e = (FileInfoElement)obj;
+        return fileName.equals(e.getFileName()) && ownerId.equals(e.getOwnerId());
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 5;
+        hash = 79 * hash + Objects.hashCode(this.fileName);
+        hash = 79 * hash + Objects.hashCode(this.ownerId);
+        return hash;
     }
     
     @Override
