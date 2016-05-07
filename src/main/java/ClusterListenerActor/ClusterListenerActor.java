@@ -150,10 +150,11 @@ public class ClusterListenerActor extends UntypedActor {
                 log.debug("Sending out file info: {}", fit.toString());
             }
 
-            //send my free space to the new arrived member
-            if(myFreeSpace!=0) getContext().actorSelection(mMemberUp.member().address() + "/user/clusterListener")
+            //send my free space to the new arrived member, if the new arrivde member is not myself
+            if(!mMemberUp.member().address().equals(cluster.selfAddress())){
+                getContext().actorSelection(mMemberUp.member().address() + "/user/clusterListener")
                     .tell(new FreeSpaceSpread(myFreeSpace), getSelf());
-
+            }
         } else if (message instanceof UnreachableMember) {
             UnreachableMember mMemberUnreachable = (UnreachableMember) message;
             log.info("Member detected as unreachable: {}", mMemberUnreachable.member());

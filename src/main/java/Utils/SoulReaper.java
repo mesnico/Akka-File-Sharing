@@ -34,6 +34,7 @@ abstract public class SoulReaper extends UntypedActor{
             getContext().watch(getSender());
             watchedActors.add(getSender());
             totalSize++;
+            progress(0,totalSize);
         } else if(message instanceof Terminated){
             //some actor dead. I remove it from the list.
             log.info("Actor {} is shutted down",getSender());

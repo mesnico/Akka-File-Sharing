@@ -243,10 +243,10 @@ public class GuiActor extends UntypedActor {
         } else if (message instanceof UpdateFreeSpace) {
             UpdateFreeSpace ufs = (UpdateFreeSpace) message;
             Label l = (Label) GUI.getStage().getScene().lookup("#freeSpaceLabel");
-            String formattedFreeSpace = (ufs.getFreeSpace()/1024 < 0)? ufs.getFreeSpace()+"B":
-                (ufs.getFreeSpace()/1048576 < 0)? ufs.getFreeSpace()/1024+"KB":
-                (ufs.getFreeSpace()/1073741824 < 0)? ufs.getFreeSpace()/(1048576)+"MB":
-                ufs.getFreeSpace()/1073741824+"GB";
+            String formattedFreeSpace = (ufs.getFreeSpace() < 1024)? ufs.getFreeSpace()+" B":
+                (ufs.getFreeSpace() < 1048576)? ufs.getFreeSpace()/1024+" KiB":
+                (ufs.getFreeSpace() < 1073741824)? ufs.getFreeSpace()/1048576+" MiB":
+                ufs.getFreeSpace()/1073741824+" GiB";
             l.setText(formattedFreeSpace);
             l.setTextFill(Color.web("#ff0000"));
             log.debug("update free space: "+formattedFreeSpace);
@@ -261,7 +261,7 @@ public class GuiActor extends UntypedActor {
             ProgressBar pb = (ProgressBar) GUI.getSecondaryStage().getScene().lookup("#progrBar");
             double progress = ((double)pu.getCompletion())/pu.getTotal();
             
-            label.setText("Status " + (int)100*progress + "% ("+pu.getCompletion()+"/"+pu.getTotal()+")");
+            label.setText("Status " + (int)(100*progress) + "% ("+pu.getCompletion()+"/"+pu.getTotal()+")");
             pb.setProgress(progress);
             
         }
