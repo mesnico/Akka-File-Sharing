@@ -44,9 +44,9 @@ public class FXMLMainController implements Initializable {
         if (row != null) {
             System.out.println(row);
             GuiActor.getClusterListenerActorRef().tell(new SendFileRequest(row.getFileName(), row.getOwner(), EnumFileModifier.WRITE), GuiActor.getGuiActorRef());
-            
+
             GUI.OpenedFile.set(row.getFileName());
-            System.out.println(row.getFileName());
+            System.out.println(row.getFileName() + ": open in write mode");
             //this has to be done in another message...
             //createStage("Modify",true);
         } else {
@@ -68,6 +68,8 @@ public class FXMLMainController implements Initializable {
             GUI.OpenedFile.set(row.getFileName());
             GuiActor.getClusterListenerActorRef().tell(new SendFileRequest(row.getFileName(), row.getOwner(), EnumFileModifier.READ), GuiActor.getGuiActorRef());
 
+            GUI.OpenedFile.set(row.getFileName());
+            System.out.println(row.getFileName() + ": open in read mode");
             //receive it if not busy
         } else {
             Alert alert = new Alert(AlertType.ERROR);
@@ -89,7 +91,7 @@ public class FXMLMainController implements Initializable {
             Stage stage = new Stage();
             stage.setScene(new Scene(root));
             stage.setTitle("Create");
-            
+
             stage.setOnCloseRequest((final WindowEvent windowEvent) -> {
                 GUI.getStage().show();
             });
@@ -102,7 +104,7 @@ public class FXMLMainController implements Initializable {
             System.out.println(ex.getMessage());
             System.out.println(ex.getCause().toString());
         }
-        
+
     }
 
     @FXML
@@ -147,8 +149,8 @@ public class FXMLMainController implements Initializable {
 
             //require the file
             /*
-            SearchFile message = new SearchFile(filter(search.getText()));//filter is a function that help to check the correctness of the search
-            GuiActor.controllerActorRef.tell(message, GuiActor.guiActorRef);
+             SearchFile message = new SearchFile(filter(search.getText()));//filter is a function that help to check the correctness of the search
+             GuiActor.controllerActorRef.tell(message, GuiActor.guiActorRef);
              */
             //another message will handle the generation of the raws in the TableView
             //initiate the search

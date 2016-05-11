@@ -41,14 +41,14 @@ public class FXMLCreateController implements Initializable {
     private void create(ActionEvent event) {
         String newFileName = file_name.getText();
         file_name.setText(newFileName);
-        if (newFileName.matches("\\s+")) {
+        if (newFileName.matches(".*\\s+.*")) {
                 Alert alert = new Alert(Alert.AlertType.WARNING);
                 alert.setTitle("Warning");
                 alert.setHeaderText("File Name contains one or more spaces");
                 alert.setContentText("File Name should not contains spaces. Try again with a name without spaces.");
 
                 alert.showAndWait();
-                file_name.setText(newFileName.replace("\\s+", ""));
+                file_name.setText(newFileName.replaceAll("\\s+", ""));
         } else {
             if (!newFileName.isEmpty()) {
                 System.out.println("You clicked Create into the new window!");
@@ -56,21 +56,21 @@ public class FXMLCreateController implements Initializable {
 
                 //validate the tags
                 List<String> tags = new ArrayList<>();
-                String tag = tag1.getText().replaceAll("\\s+", "");
+                String tag = tag1.getText().replaceAll("\\s+", "").toLowerCase();
                 //if the tag is not empty
                 if (!tag.isEmpty()) {
                     tags.add(tag);
                 }
-                tag = tag2.getText().replaceAll("\\s+", "");
+                tag = tag2.getText().replaceAll("\\s+", "").toLowerCase();
                 //if the tag is not empty and is not already present in the list
                 if (!tag.isEmpty() && !tags.contains(tag)) {
                     tags.add(tag);
                 }
-                tag = tag3.getText().replaceAll("\\s+", "");
+                tag = tag3.getText().replaceAll("\\s+", "").toLowerCase();
                 if (!tag.isEmpty() && !tags.contains(tag)) {
                     tags.add(tag);
                 }
-                tag = tag4.getText().replaceAll("\\s+", "");
+                tag = tag4.getText().replaceAll("\\s+", "").toLowerCase();
                 if (!tag.isEmpty() && !tags.contains(tag)) {
                     tags.add(tag);
                 }

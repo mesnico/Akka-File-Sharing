@@ -11,7 +11,8 @@ import java.io.Serializable;
  *
  * @author francescop
  */
-public class UpdateFreeSpace implements Serializable{
+public class UpdateFreeSpace implements Serializable {
+
     private final long freeSpace;
 
     public UpdateFreeSpace(long freeSpace) {

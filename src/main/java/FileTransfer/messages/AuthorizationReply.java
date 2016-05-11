@@ -19,17 +19,20 @@ public class AuthorizationReply implements Serializable {
     private long size;
     private List<String> tags;
     private String fileName;
+    private EnumFileModifier modifier;
     
-    public AuthorizationReply(String fileName, EnumAuthorizationReply response){
+    public AuthorizationReply(String fileName, EnumAuthorizationReply response, EnumFileModifier modifier){
         this.fileName = fileName;
         this.response = response;
+        this.modifier = modifier;
     }
     
-    public AuthorizationReply(String fileName, EnumAuthorizationReply response, long size, List<String> tags){
+    public AuthorizationReply(String fileName, EnumAuthorizationReply response, long size, List<String> tags, EnumFileModifier modifier){
         this.response = response;
         this.size = size;
         this.tags = tags;
         this.fileName = fileName;
+        this.modifier = modifier;
     }
     
     public EnumAuthorizationReply getResponse(){
@@ -46,6 +49,10 @@ public class AuthorizationReply implements Serializable {
 
     public String getFileName() {
         return fileName;
+    }
+
+    public EnumFileModifier getModifier() {
+        return modifier;
     }
     
     @Override

@@ -92,7 +92,7 @@ public class ClusterListenerActor extends UntypedActor {
         membersFreeSpace = new FreeSpaceMembersData();
         infoTable = new FileInfoDistributedTable();
         foundFiles = new FoundFiles();
-        
+
         initialFreeSpace = config.getLong("app-settings.dedicated-space");
     }
 
@@ -151,9 +151,9 @@ public class ClusterListenerActor extends UntypedActor {
             }
 
             //send my free space to the new arrived member, if the new arrivde member is not myself
-            if(!mMemberUp.member().address().equals(cluster.selfAddress())){
+            if (!mMemberUp.member().address().equals(cluster.selfAddress())) {
                 getContext().actorSelection(mMemberUp.member().address() + "/user/clusterListener")
-                    .tell(new FreeSpaceSpread(myFreeSpace), getSelf());
+                        .tell(new FreeSpaceSpread(myFreeSpace), getSelf());
             }
         } else if (message instanceof UnreachableMember) {
             UnreachableMember mMemberUnreachable = (UnreachableMember) message;
@@ -161,9 +161,9 @@ public class ClusterListenerActor extends UntypedActor {
 
         } else if (message instanceof MemberRemoved) {
             MemberRemoved mMemberRemoved = (MemberRemoved) message;
-            
+
             //if I am removed myself from the cluster, then it is time to commit suicide
-            if(mMemberRemoved.member().address().equals(cluster.selfAddress())){
+            if (mMemberRemoved.member().address().equals(cluster.selfAddress())) {
                 guiActor.tell(new GuiShutdown(), getSelf());
                 getSelf().tell(PoisonPill.getInstance(), getSelf());
             }
@@ -194,13 +194,13 @@ public class ClusterListenerActor extends UntypedActor {
                 log.info("Member removed in membersFreeSpace: {}", mMemberRemoved.member());
                 log.debug("Current membersFreeSpace status: {} ", membersFreeSpace);
             }
-            
-        //message sent when the new member arrives in the cluster. The map has to be immediately filled with the current state
+
+            //message sent when the new member arrives in the cluster. The map has to be immediately filled with the current state
         } else if (message instanceof CurrentClusterState) {
             CurrentClusterState state = (CurrentClusterState) message;
             for (Member member : state.getMembers()) {
                 if (member.status().equals(MemberStatus.up())) {
-                    membersMap.newMember(Utilities.computeId(Utilities.getAddress(member.address(),clusterSystemPort)), member);
+                    membersMap.newMember(Utilities.computeId(Utilities.getAddress(member.address(), clusterSystemPort)), member);
                 }
             }
             log.info("membersMap initialized: {}", membersMap);
@@ -210,7 +210,7 @@ public class ClusterListenerActor extends UntypedActor {
             // --- keep the freeSpace also in an updated clusterListener variable,
             // --- so that members entering could be immediately notified
             myFreeSpace = freeByteSpace;
-            
+
             //tell my free space to all the other cluster nodes
             mediator.tell(new DistributedPubSubMediator.Publish("freeSpaceTopic", new FreeSpaceSpread(freeByteSpace)),
                     getSelf());
@@ -228,15 +228,15 @@ public class ClusterListenerActor extends UntypedActor {
         } else if (message instanceof EndModify) {//this message is generated at the end of the modify operation, to begine the load distribution
             EndModify mNewFileCreation = (EndModify) message;
             String fileName = mNewFileCreation.getFileName();
-            
+
             //load distribution
             BigInteger newOwnerId = membersFreeSpace.getHighestFreeSpaceMember();
-            log.debug("The chosen one for taking care of {} is {}",fileName,newOwnerId);
+            log.debug("The chosen one for taking care of {} is {}", fileName, newOwnerId);
             Member newOwner = membersMap.getMemberById(newOwnerId);
-            
+
             //if the member with higher free space has a negative free space, it means that all nodes are quitting,
             //so it's useless to distribute the files I own. I kill all.
-            if(membersFreeSpace.getHighestFreeSpace()<0){
+            if (membersFreeSpace.getHighestFreeSpace() < 0) {
                 server.tell(PoisonPill.getInstance(), getSelf());
                 getSelf().tell(new LeaveAndClose(), getSelf());
             }
@@ -253,8 +253,8 @@ public class ClusterListenerActor extends UntypedActor {
                                 InetAddress.getByName(newOwner.address().host().get()),
                                 (int) newOwner.address().port().get(),
                                 new Handshake(EnumBehavior.SEND, fileName)),
-                        "fileTransferAsker"+UUID.randomUUID().toString());
-                
+                        "fileTransferAsker" + UUID.randomUUID().toString());
+
                 //don't need to update tags... this is performed at the end of the file send
                 //now we have just to create the file into the FileTable of my server
             }
@@ -279,11 +279,11 @@ public class ClusterListenerActor extends UntypedActor {
         } else if (message instanceof SendFileRequest) {
             SendFileRequest fileRequest = (SendFileRequest) message;
             Member fileOwner = membersMap.getMemberById(fileRequest.getOwnerId());
-            
-            if(fileOwner == null){
-                log.warning("The file {} cannot be transferred! The owner is falled",fileRequest.getFileName());
+
+            if (fileOwner == null) {
+                log.warning("The file {} cannot be transferred! The owner is falled", fileRequest.getFileName());
                 FileTransferResult transferResult = new FileTransferResult(
-                        EnumEnding.FILE_TO_RECEIVE_NOT_EXISTS,fileRequest.getFileName(),fileRequest.getModifier());
+                        EnumEnding.FILE_TO_RECEIVE_NOT_EXISTS, fileRequest.getFileName(), fileRequest.getModifier());
                 guiActor.tell(transferResult, getSelf());
                 return;
             }
@@ -294,11 +294,11 @@ public class ClusterListenerActor extends UntypedActor {
                 //no transfer is needed
 
                 log.info("Not needed to transfer the file {} from remote: the owner is myself!", fileRequest.getFileName());
-                
+
                 //ask for the freeness of the file in order to be opened in write mode
-                Handshake handshake = new Handshake(null,fileRequest.getFileName(),EnumFileModifier.WRITE);
+                Handshake handshake = new Handshake(null, fileRequest.getFileName(), fileRequest.getModifier());
                 server.tell(handshake, getSelf());
-                
+
             } else {
                 log.info("Starting remote transfering for the file {}", fileRequest.getFileName());
                 //file transfer REQUEST
@@ -307,18 +307,18 @@ public class ClusterListenerActor extends UntypedActor {
                                 InetAddress.getByName(fileOwner.address().host().get()),
                                 (int) fileOwner.address().port().get(),
                                 new Handshake(EnumBehavior.REQUEST, fileRequest.getFileName(), fileRequest.getModifier())),
-                        "fileTransferAsker"+UUID.randomUUID().toString());
+                        "fileTransferAsker" + UUID.randomUUID().toString());
             }
-        
+
         } else if (message instanceof AuthorizationReply) {
-            AuthorizationReply reply = (AuthorizationReply)message;
+            AuthorizationReply reply = (AuthorizationReply) message;
             FileTransferResult result;
-            if(reply.getResponse() == EnumAuthorizationReply.AUTHORIZATION_GRANTED){
+            if (reply.getResponse() == EnumAuthorizationReply.AUTHORIZATION_GRANTED) {
                 result = new FileTransferResult(EnumEnding.FILE_RECEIVED_SUCCESSFULLY,
-                        reply.getFileName(),EnumFileModifier.WRITE);
+                        reply.getFileName(), reply.getModifier());
             } else {
                 result = new FileTransferResult(EnumEnding.FILE_TO_RECEIVE_BUSY,
-                        reply.getFileName(),EnumFileModifier.WRITE);
+                        reply.getFileName(), reply.getModifier());
             }
             guiActor.tell(result, getSelf());
 
@@ -397,10 +397,10 @@ public class ClusterListenerActor extends UntypedActor {
             //create the FileTransfer soul reaper in order to close the server and the cluster listener
             //only when all the transfers are completed
             //create the Soul Reaper actor to watch out all the others
-            getContext().actorOf(Props.create(FileTransferSoulReaper.class,server,guiActor,getSelf()), "fileTransferSoulReaper");
-            
+            getContext().actorOf(Props.create(FileTransferSoulReaper.class, server, guiActor, getSelf()), "fileTransferSoulReaper");
+
             log.info("The system is going to shutdown!");
-            
+
             //transfer all my infos to my successor node
             Member newInfoResponsable = membersMap.getSuccessorMemberById(
                     Utilities.computeId(localAddress));
@@ -410,16 +410,16 @@ public class ClusterListenerActor extends UntypedActor {
             //send the infos to the new responsible
             getContext().actorSelection(newInfoResponsable.address() + "/user/clusterListener")
                     .tell(fit, getSelf());
-            
+
             //virtually remove myself from the priority queue putting a very low size
             myFreeSpace = -initialFreeSpace;
             membersFreeSpace.updateMemberFreeSpace(Utilities.computeId(localAddress), myFreeSpace);
             FreeSpaceSpread veryLowSpace = new FreeSpaceSpread(myFreeSpace);
             mediator.tell(new DistributedPubSubMediator.Publish("freeSpaceTopic", veryLowSpace),
                     getSelf());
-            
+
             server.tell(new InitiateShutdown(), getSelf());
-        
+
         } else if (message instanceof LeaveAndClose) {
 
             cluster.leave(cluster.selfAddress());
@@ -431,8 +431,8 @@ public class ClusterListenerActor extends UntypedActor {
             unhandled(message);
         }
     }
-    
-    private Member getNonClosingResponsable(String tag){
+
+    private Member getNonClosingResponsable(String tag) {
         Member nonClosingResponsable;
         BigInteger realResponsible = membersMap.getResponsibleById(Utilities.computeId(tag));
         if (membersFreeSpace.getFreeSpaceElement(realResponsible).freeByteSpace < 0) {
