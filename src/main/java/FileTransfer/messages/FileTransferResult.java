@@ -17,21 +17,30 @@ public class FileTransferResult implements Serializable {
     private EnumEnding msg;
     private String fileName;
     private EnumFileModifier modifier;
+    private boolean isAsker;
     
     public FileTransferResult(EnumEnding msg){
         this.msg = msg;
         this.fileName = "";
+        isAsker = false;
+        // --- About isAsker: is it's is esplicitly setted in the fileTransferActor,
+        // --- while this doesn't happen (and it's ok this way) in the other cases,
+        // --- so in other cases it must be set to false so the server doesn't occupy the file
     }
     
     public FileTransferResult(EnumEnding msg, String fileName){
-        this.msg = msg;
+        this(msg);
         this.fileName = fileName;
     }
     
     public FileTransferResult(EnumEnding msg, String fileName, EnumFileModifier modifier){
-        this.msg = msg;
-        this.fileName = fileName;
+        this(msg, fileName);
         this.modifier = modifier;
+    }
+    
+    public FileTransferResult(EnumEnding msg, String fileName, EnumFileModifier modifier, boolean isAsker){
+        this(msg, fileName, modifier);
+        this.isAsker = isAsker;
     }
     
     public EnumEnding getMessageType(){
@@ -44,6 +53,10 @@ public class FileTransferResult implements Serializable {
     
     public EnumFileModifier getFileModifier(){
         return modifier;
+    }
+
+    public boolean isIsAsker() {
+        return isAsker;
     }
     
     @Override

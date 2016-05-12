@@ -256,6 +256,14 @@ public class Server extends UntypedActorWithStash {
                                 Utilities.computeId(Utilities.getAddress(getSelf().path().address(), localClusterSystemPort)));
                         myClusterListener.tell(tagsMessage, getSelf());
                     }
+                    
+                    if (fileTransferResult.getFileModifier() == EnumFileModifier.WRITE &&
+                            fileTransferResult.isIsAsker() == true){
+                        // --- We have asked a file for modifying it, so it must be occupied.
+                        FileElement toUpdate = fileTable.getFileElement(fileTransferResult.getFileName());
+                        toUpdate.setOccupied(true);
+                    }
+                    
                     myGuiActor.tell(msg, getSelf());
                     break;
 

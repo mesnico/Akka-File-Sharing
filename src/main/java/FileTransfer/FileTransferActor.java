@@ -66,6 +66,7 @@ public class FileTransferActor extends UntypedActor {
     private String tmpFilePath = System.getProperty("java.io.tmpdir");
     private boolean fileOccupiedByMe;
     private String remoteActorName;
+    private boolean isAsker;
 
     // ---------------------- //
     // ---- CONSTRUCTORS ---- //
@@ -145,6 +146,7 @@ public class FileTransferActor extends UntypedActor {
         switch (handshake.getBehavior()) {
             case SEND:
             case REQUEST:
+                isAsker = true;
                 // --- I am the asker, so I have to connect to the remoteServer.
                 // --- The tcpManager does this for me.
                 remoteServer = getContext().actorSelection("akka.tcp://ClusterSystem@" + interlocutorIp.getHostAddress() + ":"
@@ -154,6 +156,7 @@ public class FileTransferActor extends UntypedActor {
                 log.debug("Remote server's name is {}", remoteServer);
                 break;
             case UNINITIALIZED:
+                isAsker = false;
                 // --- I am the responder, I was spawned by my server for handling an
                 // --- incoming connection. I'll ack the asker peer just to let him know my address
                 ActorSelection interlocutorSelection = getContext().actorSelection("akka.tcp://ClusterSystem@" + interlocutorIp.getHostAddress() + ":"
