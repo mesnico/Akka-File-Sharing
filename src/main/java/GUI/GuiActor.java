@@ -11,6 +11,7 @@ import ClusterListenerActor.messages.EndModify;
 import ClusterListenerActor.messages.SpreadTags;
 import ClusterListenerActor.messages.TagSearchGuiResponse;
 import FileTransfer.messages.AllocationRequest;
+import FileTransfer.messages.EnumEnding;
 import FileTransfer.messages.EnumFileModifier;
 import FileTransfer.messages.FileTransferResult;
 import FileTransfer.messages.SimpleAnswer;
@@ -187,7 +188,16 @@ public class GuiActor extends UntypedActor {
             if (ftr.getFileName().equals(GUI.OpenedFile.getName())) {
                 GUI.getStage().show();
                 switch (ftr.getMessageType()) {
+                    case OWNER_IS_MYSELF:
                     case FILE_RECEIVED_SUCCESSFULLY:
+                        if (ftr.getMessageType() == EnumEnding.OWNER_IS_MYSELF && ftr.getFileModifier() == EnumFileModifier.READ) {
+                            // copy the file from current directory to tmp directory
+                            Files.copy(
+                                    new File(filePath + ftr.getFileName()).toPath(),
+                                    new File(tmpFilePath + ftr.getFileName()).toPath(),
+                                    REPLACE_EXISTING
+                            );
+                        }
                         boolean isWrite = (ftr.getFileModifier() == EnumFileModifier.WRITE);
                         String path = (isWrite) ? filePath : tmpFilePath;
                         File file = new File(path + ftr.getFileName());

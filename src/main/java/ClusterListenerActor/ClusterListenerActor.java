@@ -294,7 +294,7 @@ public class ClusterListenerActor extends UntypedActor {
                 //no transfer is needed
 
                 log.info("Not needed to transfer the file {} from remote: the owner is myself!", fileRequest.getFileName());
-
+                
                 //ask for the freeness of the file in order to be opened in write mode
                 Handshake handshake = new Handshake(null, fileRequest.getFileName(), fileRequest.getModifier());
                 server.tell(handshake, getSelf());
@@ -314,7 +314,7 @@ public class ClusterListenerActor extends UntypedActor {
             AuthorizationReply reply = (AuthorizationReply) message;
             FileTransferResult result;
             if (reply.getResponse() == EnumAuthorizationReply.AUTHORIZATION_GRANTED) {
-                result = new FileTransferResult(EnumEnding.FILE_RECEIVED_SUCCESSFULLY,
+                result = new FileTransferResult(EnumEnding.OWNER_IS_MYSELF,
                         reply.getFileName(), reply.getModifier());
             } else {
                 result = new FileTransferResult(EnumEnding.FILE_TO_RECEIVE_BUSY,
