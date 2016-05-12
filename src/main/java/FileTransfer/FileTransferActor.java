@@ -340,7 +340,7 @@ public class FileTransferActor extends UntypedActor {
             private FileTransferResult result;
             
             public void terminate(EnumEnding msg) {
-                result = new FileTransferResult(msg, handshake.getFileName(), handshake.getModifier());
+                result = new FileTransferResult(msg, handshake.getFileName(), handshake.getModifier(), isAsker);
                 myServer.tell(result, getSelf());
 
                 getSelf().tell(PoisonPill.getInstance(), getSelf());

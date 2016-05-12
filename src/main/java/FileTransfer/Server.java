@@ -259,6 +259,9 @@ public class Server extends UntypedActorWithStash {
                     
                     if (fileTransferResult.getFileModifier() == EnumFileModifier.WRITE &&
                             fileTransferResult.isIsAsker() == true){
+                        System.out.printf("I, the server, have received a"
+                                + "FILE_RECEIVED_SUCCESSFULLY on file %s that I was requesting"
+                                + "in write mode, so I have to occupy it\n", fileTransferResult.getFileName());
                         // --- We have asked a file for modifying it, so it must be occupied.
                         FileElement toUpdate = fileTable.getFileElement(fileTransferResult.getFileName());
                         toUpdate.setOccupied(true);
