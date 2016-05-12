@@ -377,11 +377,12 @@ public class FileTransferActor extends UntypedActor {
                                     getSelf().tell(answer, getSelf());
                                 }
                             } else {
-                                // --- READ request: I will give the permission without asking the server --- //
+                                // --- READ request: I will give myself the permission without asking the server --- //
+                                size = reply.getSize();
                                 SimpleAnswer answer = new SimpleAnswer(true);
                                 getSelf().tell(answer, getSelf());
-                            break;
                             }
+                            break;
                     }
                 } else if (msg instanceof SimpleAnswer) {
                     // --- This is the reply from my server, telling me if there is enough space

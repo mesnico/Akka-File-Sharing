@@ -212,7 +212,8 @@ public class Server extends UntypedActorWithStash {
             SimpleAnswer answer = new SimpleAnswer(permit);
             getSender().tell(answer, getSelf());
 
-        } // --------------------------- //
+        } 
+        // --------------------------- //
         // ---- HANDSHAKE MESSAGE ---- //
         // --------------------------- //        
         else if (msg instanceof Handshake) {
