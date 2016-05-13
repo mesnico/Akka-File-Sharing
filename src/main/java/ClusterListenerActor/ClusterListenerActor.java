@@ -312,14 +312,22 @@ public class ClusterListenerActor extends UntypedActor {
 
         } else if (message instanceof AuthorizationReply) {
             AuthorizationReply reply = (AuthorizationReply) message;
-            FileTransferResult result;
-            if (reply.getResponse() == EnumAuthorizationReply.AUTHORIZATION_GRANTED) {
-                result = new FileTransferResult(EnumEnding.OWNER_IS_MYSELF,
-                        reply.getFileName(), reply.getModifier());
-            } else {
-                result = new FileTransferResult(EnumEnding.FILE_TO_RECEIVE_BUSY,
-                        reply.getFileName(), reply.getModifier());
+            EnumEnding ending;
+            switch(reply.getResponse()){
+                case AUTHORIZATION_GRANTED:
+                    ending = EnumEnding.OWNER_IS_MYSELF;
+                    break;
+                case FILE_BUSY:
+                    ending = EnumEnding.FILE_TO_RECEIVE_BUSY;
+                    break;
+                case FILE_NOT_EXISTS:
+                    ending = EnumEnding.FILE_TO_RECEIVE_NOT_EXISTS;
+                    break;
+                default: 
+                    ending = EnumEnding.FILE_TO_RECEIVE_NOT_EXISTS;
             }
+            FileTransferResult result = new FileTransferResult(ending,
+                    reply.getFileName(), reply.getModifier());
             guiActor.tell(result, getSelf());
 
         } else if (message instanceof SendCreationRequest) {
