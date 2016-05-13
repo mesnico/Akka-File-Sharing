@@ -244,8 +244,8 @@ public class GuiActor extends UntypedActor {
         } else if (message instanceof SimpleAnswer) {
             SimpleAnswer sa = (SimpleAnswer) message;
             log.debug("I received the simpleAnswer {} from the server", sa.getAnswer());
-            File modifile = new File(GuiActor.getFilePath() + GUI.OpenedFile.getName());
             if (sa.getAnswer() == true) {
+                File modifile = new File(GuiActor.getFilePath() + GUI.OpenedFile.getName());
                 GuiActor.getClusterListenerActorRef().tell(
                         new EndModify(GUI.OpenedFile.getName(), modifile.length()),
                         GuiActor.getGuiActorRef());
@@ -262,10 +262,7 @@ public class GuiActor extends UntypedActor {
                  TODO: handle rollback:
                  deleting all tags and the file itself
                  can find infos in OpenedFile
-                 */
-                //delete the file
-                modifile.delete();
-                
+                 */                
                 //delete all tags
                 clusterListenerActorRef.tell(new SendDeleteInfos(GUI.OpenedFile.getName(),GUI.OpenedFile.getTags()), getSelf());
             }

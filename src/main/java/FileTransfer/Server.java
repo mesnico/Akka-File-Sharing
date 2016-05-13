@@ -12,9 +12,10 @@ import Utils.Utilities;
 import ClusterListenerActor.messages.EndModify;
 import ClusterListenerActor.messages.InitiateShutdown;
 import ClusterListenerActor.messages.LeaveAndClose;
-import ClusterListenerActor.messages.SpreadTags;
+import ClusterListenerActor.messages.SpreadInfos;
 import FileTransfer.messages.AllocationRequest;
 import FileTransfer.messages.AuthorizationReply;
+import FileTransfer.messages.EnumEnding;
 import FileTransfer.messages.EnumFileModifier;
 import FileTransfer.messages.FileTransferResult;
 import FileTransfer.messages.Handshake;
@@ -88,7 +89,7 @@ public class Server extends UntypedActorWithStash {
         // --- corresponding space and delete the received part of the file  
         String fileName = fileTransferResult.getFileName();
         if (fileTransferResult.getFileModifier() == EnumFileModifier.WRITE) {
-            log.info("Deleting fileEntry and corresponding corrputed file {}", filePath + fileName);
+            log.info("Deleting fileEntry and corresponding corrupted file {}", filePath + fileName);
             FileElement e = fileTable.deleteEntry(fileName);
             if (e == null) {
                 log.info("The rollBack has no effect on {}", fileName);
@@ -96,7 +97,11 @@ public class Server extends UntypedActorWithStash {
                 myFreeSpace += e.getSize();
             }
             File corruptedFile = new File(filePath + fileName);
-            if (corruptedFile.exists() && corruptedFile.canWrite()) {
+
+            // --- if I have not updated search tags and casually the file to delete in the rollback is mine,
+            // --- an error occurs (the file is really deleted). To avoid this, the last check (the messageType)
+            // --- has to be taken in consideration
+            if (corruptedFile.exists() && corruptedFile.canWrite() && fileTransferResult.getMessageType() != EnumEnding.FILE_TO_RECEIVE_NOT_EXISTS) {
                 corruptedFile.delete();
                 log.debug("Now the file must be deleted");
             }
@@ -167,22 +172,24 @@ public class Server extends UntypedActorWithStash {
                     log.error("Someone tried to send me the file {} I already own", request.getFileName());
                 }
                 log.debug("Received AllocationRequest. The size was 0 so no SimpleAnswer is sent back");
-            } else {
-                if (myFreeSpace >= request.getSize()) {
-                    myFreeSpace -= request.getSize();
-                    boolean occupied = request.isBusy();
-                    FileElement newElement = new FileElement(occupied, request.getSize(),
-                            request.getTags());
-                    if (fileTable.createOrUpdateEntry(request.getFileName(), newElement) == false) {
-                        log.error("Someone tried to send me the file {} I already own", request.getFileName());
-                    }
-                    myClusterListener.tell(new SendFreeSpaceSpread(myFreeSpace), getSelf());
-                    getSender().tell(new SimpleAnswer(true), getSelf());
-                    log.debug("Received AllocationRequest. Sending out the response: true");
-                } else {
-                    getSender().tell(new SimpleAnswer(false), getSelf());
-                    log.debug("Received AllocationRequest. Sending out the response: false");
+            } else if (myFreeSpace >= request.getSize()) {
+                myFreeSpace -= request.getSize();
+                boolean occupied = request.isBusy();
+                FileElement newElement = new FileElement(occupied, request.getSize(),
+                        request.getTags());
+                if (fileTable.createOrUpdateEntry(request.getFileName(), newElement) == false) {
+                    log.error("Someone tried to send me the file {} I already own", request.getFileName());
                 }
+                myClusterListener.tell(new SendFreeSpaceSpread(myFreeSpace), getSelf());
+                getSender().tell(new SimpleAnswer(true), getSelf());
+                log.debug("Received AllocationRequest. Sending out the response: true");
+            } else {
+                getSender().tell(new SimpleAnswer(false), getSelf());
+                FileTransferResult dummyTransferResult
+                        = new FileTransferResult(EnumEnding.FILE_RECEIVING_FAILED,
+                                request.getFileName(), EnumFileModifier.WRITE);
+                receiverRollBack(dummyTransferResult);
+                log.debug("Received AllocationRequest. Sending out the response: false");
             }
 
         } else if (msg instanceof UpdateFileEntry) {
@@ -203,17 +210,22 @@ public class Server extends UntypedActorWithStash {
             if (myFreeSpace >= updateRequest.getSize() - oldSize) {
                 myFreeSpace -= updateRequest.getSize() - oldSize;
 
-                //tell the cluster the updated size
-                myClusterListener.tell(new SendFreeSpaceSpread(myFreeSpace), getSelf());
                 permit = true;
             } else {
                 permit = false;
+                FileTransferResult dummyTransferResult
+                        = new FileTransferResult(EnumEnding.FILE_RECEIVING_FAILED,
+                                updateRequest.getFileName(), EnumFileModifier.WRITE);
+                receiverRollBack(dummyTransferResult);
             }
+
+            //tell the cluster the updated size
+            myClusterListener.tell(new SendFreeSpaceSpread(myFreeSpace), getSelf());
+            
             SimpleAnswer answer = new SimpleAnswer(permit);
             getSender().tell(answer, getSelf());
 
-        } 
-        // --------------------------- //
+        } // --------------------------- //
         // ---- HANDSHAKE MESSAGE ---- //
         // --------------------------- //        
         else if (msg instanceof Handshake) {
@@ -234,7 +246,9 @@ public class Server extends UntypedActorWithStash {
 
             switch (fileTransferResult.getMessageType()) {
                 case CONNECTION_FAILED:
-                    myGuiActor.tell(msg, getSelf());
+                    if (fileTransferResult.isAsker()) {
+                        myGuiActor.tell(msg, getSelf());
+                    }
                     break;
 
                 case FILE_TO_RECEIVE_BUSY:
@@ -243,7 +257,9 @@ public class Server extends UntypedActorWithStash {
                 case FILE_RECEIVING_FAILED:
                 case IO_ERROR_WHILE_RECEIVING:
                     receiverRollBack(fileTransferResult);
-                    myGuiActor.tell(msg, getSelf());
+                    if (fileTransferResult.isAsker()) {
+                        myGuiActor.tell(msg, getSelf());
+                    }
                     break;
 
                 case FILE_RECEIVED_SUCCESSFULLY:
@@ -251,14 +267,14 @@ public class Server extends UntypedActorWithStash {
                         SendFreeSpaceSpread spaceToPublish = new SendFreeSpaceSpread(myFreeSpace);
                         myClusterListener.tell(spaceToPublish, getSelf());
 
-                        SpreadTags tagsMessage = new SpreadTags(fileName,
+                        SpreadInfos tagsMessage = new SpreadInfos(fileName,
                                 fileTable.getFileElement(fileName).getTags(),
                                 Utilities.computeId(Utilities.getAddress(getSelf().path().address(), localClusterSystemPort)));
                         myClusterListener.tell(tagsMessage, getSelf());
                     }
-                    
-                    if (fileTransferResult.getFileModifier() == EnumFileModifier.WRITE &&
-                            fileTransferResult.isIsAsker() == true){
+
+                    if (fileTransferResult.getFileModifier() == EnumFileModifier.WRITE
+                            && fileTransferResult.isAsker() == true) {
                         System.out.printf("I, the server, have received a"
                                 + "FILE_RECEIVED_SUCCESSFULLY on file %s that I was requesting"
                                 + "in write mode, so I have to occupy it\n", fileTransferResult.getFileName());
@@ -266,8 +282,9 @@ public class Server extends UntypedActorWithStash {
                         FileElement toUpdate = fileTable.getFileElement(fileTransferResult.getFileName());
                         toUpdate.setOccupied(true);
                     }
-                    
-                    myGuiActor.tell(msg, getSelf());
+                    if (fileTransferResult.isAsker()) {
+                        myGuiActor.tell(msg, getSelf());
+                    }
                     break;
 
                 case FILE_TO_SEND_NOT_EXISTS:
@@ -275,12 +292,12 @@ public class Server extends UntypedActorWithStash {
                 case IO_ERROR_WHILE_SENDING:
                 case FILE_NO_MORE_BUSY:
                     senderRollBack(fileTransferResult);
-                    myGuiActor.tell(msg, getSelf());
+                    //myGuiActor.tell(msg, getSelf());
                     break;
 
                 case FILE_TO_SEND_BUSY:
                 case FILE_SENDING_FAILED:
-                    myGuiActor.tell(msg, getSelf());
+                    //myGuiActor.tell(msg, getSelf());
                     break;
 
                 case FILE_OPENING_FAILED:

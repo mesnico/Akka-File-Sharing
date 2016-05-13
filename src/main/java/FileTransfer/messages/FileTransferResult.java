@@ -55,7 +55,7 @@ public class FileTransferResult implements Serializable {
         return modifier;
     }
 
-    public boolean isIsAsker() {
+    public boolean isAsker() {
         return isAsker;
     }
     

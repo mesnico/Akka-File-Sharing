@@ -45,14 +45,14 @@ public class FileInfoDistributedTable {
     
     /*public List<FileInfoElement> removeByTag(String tag){
         return fileInfo.remove(tag);
-    }
+    }*/
     
     public boolean removeByTagAndName(String tag, String fileName){
         FileInfoElement toDelete = existsFile(tag,fileName);
         if(toDelete == null) 
             return false;
         return fileInfo.get(tag).remove(toDelete);
-    }*/
+    }
     
     //This method update the tag if the is was found, and return true;
     //else if the tag wasn't present, it is created and returns false.
