@@ -6,21 +6,19 @@
 package ClusterListenerActor.messages;
 
 import java.io.Serializable;
-import java.math.BigInteger;
 
 /**
  *
  * @author francescop
  */
-public class UpdateTag  implements Serializable{
-    String fileName;
-    String tag;
-    BigInteger ownerId;
+public class DeleteInfos implements Serializable {
 
-    public UpdateTag(String fileName, String tag, BigInteger ownerId) {
+    private String fileName;
+    private String tag;
+
+    public DeleteInfos(String fileName, String tag) {
         this.fileName = fileName;
         this.tag = tag;
-        this.ownerId = ownerId;
     }
 
     public String getFileName() {
@@ -31,12 +29,4 @@ public class UpdateTag  implements Serializable{
         return tag;
     }
 
-    public BigInteger getOwnerId() {
-        return ownerId;
-    }
-    
-    @Override
-    public String toString(){
-        return "fileName: "+fileName+"; tag: "+tag+"; ownerId: "+ownerId;
-    }
 }

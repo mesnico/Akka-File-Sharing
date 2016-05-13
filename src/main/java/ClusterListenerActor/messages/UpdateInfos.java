@@ -7,21 +7,19 @@ package ClusterListenerActor.messages;
 
 import java.io.Serializable;
 import java.math.BigInteger;
-import java.util.List;
 
 /**
  *
  * @author francescop
  */
-public class SpreadTags implements Serializable{
-    
+public class UpdateInfos  implements Serializable{
     String fileName;
-    List<String> tags;
+    String tag;
     BigInteger ownerId;
 
-    public SpreadTags(String fileName, List<String> tags, BigInteger ownerId) {
+    public UpdateInfos(String fileName, String tag, BigInteger ownerId) {
         this.fileName = fileName;
-        this.tags = tags;
+        this.tag = tag;
         this.ownerId = ownerId;
     }
 
@@ -29,11 +27,16 @@ public class SpreadTags implements Serializable{
         return fileName;
     }
 
-    public List<String> getTags() {
-        return tags;
+    public String getTag() {
+        return tag;
     }
 
     public BigInteger getOwnerId() {
         return ownerId;
+    }
+    
+    @Override
+    public String toString(){
+        return "fileName: "+fileName+"; tag: "+tag+"; ownerId: "+ownerId;
     }
 }

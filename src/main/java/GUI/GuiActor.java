@@ -7,8 +7,9 @@ package GUI;
 
 import Utils.Utilities;
 import ClusterListenerActor.messages.CreationResponse;
+import ClusterListenerActor.messages.SendDeleteInfos;
 import ClusterListenerActor.messages.EndModify;
-import ClusterListenerActor.messages.SpreadTags;
+import ClusterListenerActor.messages.SpreadInfos;
 import ClusterListenerActor.messages.TagSearchGuiResponse;
 import FileTransfer.messages.AllocationRequest;
 import FileTransfer.messages.EnumEnding;
@@ -143,7 +144,7 @@ public class GuiActor extends UntypedActor {
                 server.tell(newReq, getSelf());
 
                 //spread the tags
-                SpreadTags tagsMessage = new SpreadTags(GUI.OpenedFile.getName(),
+                SpreadInfos tagsMessage = new SpreadInfos(GUI.OpenedFile.getName(),
                         GUI.OpenedFile.getTags(),
                         Utilities.computeId(Utilities.getAddress(getSelf().path().address(), clusterSystemPort)));
                 clusterListenerActorRef.tell(tagsMessage, getSelf());
@@ -187,6 +188,7 @@ public class GuiActor extends UntypedActor {
             //if (GUI.getStage().isShowing()) {
             if (ftr.getFileName().equals(GUI.OpenedFile.getName())) {
                 GUI.getStage().show();
+                Alert alert;
                 switch (ftr.getMessageType()) {
                     case OWNER_IS_MYSELF:
                     case FILE_RECEIVED_SUCCESSFULLY:
@@ -218,7 +220,7 @@ public class GuiActor extends UntypedActor {
                     case FILE_RECEIVING_FAILED:
                     case FILE_TO_RECEIVE_NOT_EXISTS:
                     case FILE_TO_RECEIVE_BUSY:
-                        Alert alert = new Alert(Alert.AlertType.ERROR);
+                        alert = new Alert(Alert.AlertType.ERROR);
                         alert.setTitle("Error");
                         alert.setHeaderText("Receiving Failed");
                         alert.setContentText("An error occurred during file transfer!: " + ftr.getMessageType().toString());
@@ -226,17 +228,24 @@ public class GuiActor extends UntypedActor {
                         alert.showAndWait();
                         GUI.OpenedFile.unset();
                         break;
+                    case CONNECTION_FAILED:
+                        alert = new Alert(Alert.AlertType.ERROR);
+                        alert.setTitle("Error");
+                        alert.setHeaderText("Connection Failed");
+                        alert.setContentText("An error occurred during file transfer!: " + ftr.getMessageType().toString());
 
-                    //following case handles progress bars during load balancing...
-                    //case FILE_SENT_SUCCESSFULLY:
+                        alert.showAndWait();
+                        GUI.OpenedFile.unset();
+                        break;
+
                 }
-
             }
+
         } else if (message instanceof SimpleAnswer) {
             SimpleAnswer sa = (SimpleAnswer) message;
             log.debug("I received the simpleAnswer {} from the server", sa.getAnswer());
+            File modifile = new File(GuiActor.getFilePath() + GUI.OpenedFile.getName());
             if (sa.getAnswer() == true) {
-                File modifile = new File(GuiActor.getFilePath() + GUI.OpenedFile.getName());
                 GuiActor.getClusterListenerActorRef().tell(
                         new EndModify(GUI.OpenedFile.getName(), modifile.length()),
                         GuiActor.getGuiActorRef());
@@ -254,6 +263,11 @@ public class GuiActor extends UntypedActor {
                  deleting all tags and the file itself
                  can find infos in OpenedFile
                  */
+                //delete the file
+                modifile.delete();
+                
+                //delete all tags
+                clusterListenerActorRef.tell(new SendDeleteInfos(GUI.OpenedFile.getName(),GUI.OpenedFile.getTags()), getSelf());
             }
             GUI.OpenedFile.unset();
 
@@ -266,8 +280,11 @@ public class GuiActor extends UntypedActor {
                             : (ufs.getFreeSpace() < 1000000000) ? df.format((double) ufs.getFreeSpace() / 1048576) + " MiB"
                                     : df.format((double) ufs.getFreeSpace() / 1073741824) + " GiB";
             l.setText(formattedFreeSpace);
-            if(ufs.getFreeSpace()<20*1024*1024) l.setTextFill(Color.web("#ff0000"));
-            else l.setTextFill(Color.web("#00ff00"));
+            if (ufs.getFreeSpace() < 20 * 1024 * 1024) {
+                l.setTextFill(Color.web("#ff0000"));
+            } else {
+                l.setTextFill(Color.web("#00ff00"));
+            }
             log.debug("update free space: " + formattedFreeSpace);
 
         } else if (message instanceof GuiShutdown) {

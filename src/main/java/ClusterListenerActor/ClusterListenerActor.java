@@ -6,19 +6,19 @@ import ClusterListenerActor.messages.EndModify;
 import ClusterListenerActor.messages.FileInfoTransfer;
 import ClusterListenerActor.messages.FreeSpaceSpread;
 import ClusterListenerActor.messages.CreationRequest;
-import ClusterListenerActor.messages.UpdateTag;
+import ClusterListenerActor.messages.UpdateInfos;
 import ClusterListenerActor.messages.CreationResponse;
+import ClusterListenerActor.messages.DeleteInfos;
+import ClusterListenerActor.messages.SendDeleteInfos;
 import ClusterListenerActor.messages.LeaveAndClose;
-import ClusterListenerActor.messages.SpreadTags;
+import ClusterListenerActor.messages.SpreadInfos;
 import ClusterListenerActor.messages.TagSearchRequest;
 import ClusterListenerActor.messages.TagSearchResponse;
 import FileTransfer.FileTransferActor;
 import FileTransfer.FileTransferSoulReaper;
 import FileTransfer.messages.AuthorizationReply;
-import FileTransfer.messages.EnumAuthorizationReply;
 import FileTransfer.messages.EnumBehavior;
 import FileTransfer.messages.EnumEnding;
-import FileTransfer.messages.EnumFileModifier;
 import FileTransfer.messages.FileTransferResult;
 import FileTransfer.messages.Handshake;
 import FileTransfer.messages.SendFreeSpaceSpread;
@@ -259,23 +259,6 @@ public class ClusterListenerActor extends UntypedActor {
                 //now we have just to create the file into the FileTable of my server
             }
 
-        } else if (message instanceof SpreadTags) {
-            //used from the EndModify and end of file transfer
-
-            SpreadTags msg = (SpreadTags) message;
-            Member responsible;
-            for (String tag : msg.getTags()) {
-                //If the member where i'm going to put the tag is closing, then I put the tag on its successor
-                responsible = getNonClosingResponsable(tag);
-                getContext().actorSelection(responsible.address() + "/user/clusterListener")
-                        .tell(new UpdateTag(msg.getFileName(), tag, msg.getOwnerId()), getSelf());
-            }
-
-            //Also the file name information has to be stored as like as other tags
-            responsible = getNonClosingResponsable(msg.getFileName());
-            getContext().actorSelection(responsible.address() + "/user/clusterListener")
-                    .tell(new UpdateTag(msg.getFileName(), msg.getFileName(), msg.getOwnerId()), getSelf());
-
         } else if (message instanceof SendFileRequest) {
             SendFileRequest fileRequest = (SendFileRequest) message;
             Member fileOwner = membersMap.getMemberById(fileRequest.getOwnerId());
@@ -294,7 +277,7 @@ public class ClusterListenerActor extends UntypedActor {
                 //no transfer is needed
 
                 log.info("Not needed to transfer the file {} from remote: the owner is myself!", fileRequest.getFileName());
-                
+
                 //ask for the freeness of the file in order to be opened in write mode
                 Handshake handshake = new Handshake(null, fileRequest.getFileName(), fileRequest.getModifier());
                 server.tell(handshake, getSelf());
@@ -313,7 +296,7 @@ public class ClusterListenerActor extends UntypedActor {
         } else if (message instanceof AuthorizationReply) {
             AuthorizationReply reply = (AuthorizationReply) message;
             EnumEnding ending;
-            switch(reply.getResponse()){
+            switch (reply.getResponse()) {
                 case AUTHORIZATION_GRANTED:
                     ending = EnumEnding.OWNER_IS_MYSELF;
                     break;
@@ -323,7 +306,7 @@ public class ClusterListenerActor extends UntypedActor {
                 case FILE_NOT_EXISTS:
                     ending = EnumEnding.FILE_TO_RECEIVE_NOT_EXISTS;
                     break;
-                default: 
+                default:
                     ending = EnumEnding.FILE_TO_RECEIVE_NOT_EXISTS;
             }
             FileTransferResult result = new FileTransferResult(ending,
@@ -386,11 +369,49 @@ public class ClusterListenerActor extends UntypedActor {
             //tell the GUI actor the calculated response list
             guiActor.tell(foundFiles.createGuiResponse(), getSelf());
 
-        } else if (message instanceof UpdateTag) {
+        } else if (message instanceof SpreadInfos) {
+            //used from the EndModify and end of file transfer
+
+            SpreadInfos msg = (SpreadInfos) message;
+            Member responsible;
+            for (String tag : msg.getTags()) {
+                //If the member where i'm going to put the tag is closing, then I put the tag on its successor
+                responsible = getNonClosingResponsable(tag);
+                getContext().actorSelection(responsible.address() + "/user/clusterListener")
+                        .tell(new UpdateInfos(msg.getFileName(), tag, msg.getOwnerId()), getSelf());
+            }
+
+            //Also the file name information has to be stored as like as other tags
+            responsible = getNonClosingResponsable(msg.getFileName());
+            getContext().actorSelection(responsible.address() + "/user/clusterListener")
+                    .tell(new UpdateInfos(msg.getFileName(), msg.getFileName(), msg.getOwnerId()), getSelf());
+
+        } else if (message instanceof UpdateInfos) {
             //Receved a information for wich I'm the responsible
-            UpdateTag mAddTag = (UpdateTag) message;
+            UpdateInfos mAddTag = (UpdateInfos) message;
             infoTable.updateTag(mAddTag.getFileName(), mAddTag.getTag(), mAddTag.getOwnerId());
             log.info("Received tag: {}", mAddTag.toString());
+            log.debug("Current File Info Table: {}", infoTable.toString());
+
+        } else if (message instanceof SendDeleteInfos) {
+            SendDeleteInfos delInfos = (SendDeleteInfos) message;
+            Member responsible;
+            for (String tag : delInfos.getTags()) {
+                //If the member where i'm going to put the tag is closing, then I put the tag on its successor
+                responsible = getNonClosingResponsable(tag);
+                getContext().actorSelection(responsible.address() + "/user/clusterListener")
+                        .tell(new DeleteInfos(delInfos.getFileName(), tag), getSelf());
+            }
+
+            //Also the file name information has to be deleted as like as other tags
+            responsible = getNonClosingResponsable(delInfos.getFileName());
+            getContext().actorSelection(responsible.address() + "/user/clusterListener")
+                    .tell(new DeleteInfos(delInfos.getFileName(), delInfos.getFileName()), getSelf());
+
+        } else if (message instanceof DeleteInfos) {
+            DeleteInfos delInfos = (DeleteInfos) message;
+            log.debug("deleting the tag {} for the file {}", delInfos.getTag(), delInfos.getFileName());
+            infoTable.removeByTagAndName(delInfos.getTag(), delInfos.getFileName());
             log.debug("Current File Info Table: {}", infoTable.toString());
 
         } else if (message instanceof FileInfoTransfer) {
