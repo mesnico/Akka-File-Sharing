@@ -262,15 +262,15 @@ public class GuiActor extends UntypedActor {
                  TODO: handle rollback:
                  deleting all tags and the file itself
                  can find infos in OpenedFile
-                 */                
+                 */
                 //delete all tags
-                clusterListenerActorRef.tell(new SendDeleteInfos(GUI.OpenedFile.getName(),GUI.OpenedFile.getTags()), getSelf());
+                clusterListenerActorRef.tell(new SendDeleteInfos(GUI.OpenedFile.getName(), GUI.OpenedFile.getTags()), getSelf());
             }
             GUI.OpenedFile.unset();
 
         } else if (message instanceof UpdateFreeSpace) {
             UpdateFreeSpace ufs = (UpdateFreeSpace) message;
-            DecimalFormat df = new DecimalFormat("#.0");
+            DecimalFormat df = new DecimalFormat("#0.00");
             Label l = (Label) GUI.getStage().getScene().lookup("#freeSpaceLabel");
             String formattedFreeSpace = (ufs.getFreeSpace() < 1000) ? ufs.getFreeSpace() + " B"
                     : (ufs.getFreeSpace() < 1000000) ? df.format((double) ufs.getFreeSpace() / 1024) + " KiB"

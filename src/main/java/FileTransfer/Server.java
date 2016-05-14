@@ -172,29 +172,30 @@ public class Server extends UntypedActorWithStash {
                     log.error("Someone tried to send me the file {} I already own", request.getFileName());
                 }
                 log.debug("Received AllocationRequest. The size was 0 so no SimpleAnswer is sent back");
-            } else if (myFreeSpace >= request.getSize()) {
-                myFreeSpace -= request.getSize();
-                boolean occupied = request.isBusy();
-                FileElement newElement = new FileElement(occupied, request.getSize(),
-                        request.getTags());
-                if (fileTable.createOrUpdateEntry(request.getFileName(), newElement) == false) {
-                    log.error("Someone tried to send me the file {} I already own", request.getFileName());
+            } else {
+                if (myFreeSpace >= request.getSize()) {
+                    myFreeSpace -= request.getSize();
+                    boolean occupied = request.isBusy();
+                    FileElement newElement = new FileElement(occupied, request.getSize(),
+                            request.getTags());
+                    if (fileTable.createOrUpdateEntry(request.getFileName(), newElement) == false) {
+                        log.error("Someone tried to send me the file {} I already own", request.getFileName());
+                    }
+                    getSender().tell(new SimpleAnswer(true), getSelf());
+                    log.debug("Received AllocationRequest. Sending out the response: true");
+                } else {
+                    getSender().tell(new SimpleAnswer(false), getSelf());
+                    FileTransferResult dummyTransferResult
+                            = new FileTransferResult(EnumEnding.FILE_RECEIVING_FAILED,
+                                    request.getFileName(), EnumFileModifier.WRITE);
+                    receiverRollBack(dummyTransferResult);
+                    log.debug("Received AllocationRequest. Sending out the response: false");
                 }
                 myClusterListener.tell(new SendFreeSpaceSpread(myFreeSpace), getSelf());
-                getSender().tell(new SimpleAnswer(true), getSelf());
-                log.debug("Received AllocationRequest. Sending out the response: true");
-            } else {
-                getSender().tell(new SimpleAnswer(false), getSelf());
-                FileTransferResult dummyTransferResult
-                        = new FileTransferResult(EnumEnding.FILE_RECEIVING_FAILED,
-                                request.getFileName(), EnumFileModifier.WRITE);
-                receiverRollBack(dummyTransferResult);
-                log.debug("Received AllocationRequest. Sending out the response: false");
             }
 
         } else if (msg instanceof UpdateFileEntry) {
             boolean permit;
-            long oldSize;
             UpdateFileEntry updateRequest = (UpdateFileEntry) msg;
             log.debug("UpdateFileEntry was received: {}", updateRequest);
 
@@ -203,14 +204,14 @@ public class Server extends UntypedActorWithStash {
                 log.error("Fatal error! The FileEntry was not present for file {}", updateRequest.getFileName());
                 return;
             }
-            oldSize = toUpdate.getSize();
             toUpdate.setOccupied(updateRequest.isOccupied());
-            toUpdate.setSize(updateRequest.getSize());
 
-            if (myFreeSpace >= updateRequest.getSize() - oldSize) {
-                myFreeSpace -= updateRequest.getSize() - oldSize;
-
+            //the size update concerns only the difference between the new and old size of the file
+            if (myFreeSpace >= updateRequest.getSize() - toUpdate.getSize()) {
                 permit = true;
+                myFreeSpace -= updateRequest.getSize() - toUpdate.getSize();
+                toUpdate.setSize(updateRequest.getSize());
+
             } else {
                 permit = false;
                 FileTransferResult dummyTransferResult
@@ -221,7 +222,7 @@ public class Server extends UntypedActorWithStash {
 
             //tell the cluster the updated size
             myClusterListener.tell(new SendFreeSpaceSpread(myFreeSpace), getSelf());
-            
+
             SimpleAnswer answer = new SimpleAnswer(permit);
             getSender().tell(answer, getSelf());
 
