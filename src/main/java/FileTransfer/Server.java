@@ -12,6 +12,7 @@ import Utils.Utilities;
 import ClusterListenerActor.messages.EndModify;
 import ClusterListenerActor.messages.InitiateShutdown;
 import ClusterListenerActor.messages.LeaveAndClose;
+import ClusterListenerActor.messages.SendDeleteInfos;
 import ClusterListenerActor.messages.SpreadInfos;
 import FileTransfer.messages.AllocationRequest;
 import FileTransfer.messages.AuthorizationReply;
@@ -23,6 +24,7 @@ import FileTransfer.messages.Hello;
 import FileTransfer.messages.SendFreeSpaceSpread;
 import FileTransfer.messages.SimpleAnswer;
 import FileTransfer.messages.UpdateFileEntry;
+import GUI.GUI;
 import Utils.AddressResolver;
 import Utils.WatchMe;
 import java.net.InetSocketAddress;
@@ -171,6 +173,13 @@ public class Server extends UntypedActorWithStash {
                 if (fileTable.createOrUpdateEntry(request.getFileName(), newElement) == false) {
                     log.error("Someone tried to send me the file {} I already own", request.getFileName());
                 }
+                
+                //spread the tags
+                SpreadInfos tagsMessage = new SpreadInfos(request.getFileName(),
+                        request.getTags(),
+                        Utilities.computeId(Utilities.getAddress(getSelf().path().address(), localClusterSystemPort)));
+                myClusterListener.tell(tagsMessage, getSelf());
+                
                 log.debug("Received AllocationRequest. The size was 0 so no SimpleAnswer is sent back");
             } else {
                 if (myFreeSpace >= request.getSize()) {
@@ -181,6 +190,13 @@ public class Server extends UntypedActorWithStash {
                     if (fileTable.createOrUpdateEntry(request.getFileName(), newElement) == false) {
                         log.error("Someone tried to send me the file {} I already own", request.getFileName());
                     }
+                    
+                    //spread the tags
+                    SpreadInfos tagsMessage = new SpreadInfos(request.getFileName(),
+                            request.getTags(),
+                            Utilities.computeId(Utilities.getAddress(getSelf().path().address(), localClusterSystemPort)));
+                    myClusterListener.tell(tagsMessage, getSelf());
+                    
                     getSender().tell(new SimpleAnswer(true), getSelf());
                     log.debug("Received AllocationRequest. Sending out the response: true");
                 } else {
@@ -214,6 +230,8 @@ public class Server extends UntypedActorWithStash {
 
             } else {
                 permit = false;
+                //delete infos
+                myClusterListener.tell(new SendDeleteInfos(updateRequest.getFileName(), toUpdate.getTags()), getSelf());
                 FileTransferResult dummyTransferResult
                         = new FileTransferResult(EnumEnding.FILE_RECEIVING_FAILED,
                                 updateRequest.getFileName(), EnumFileModifier.WRITE);

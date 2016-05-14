@@ -137,20 +137,17 @@ public class GuiActor extends UntypedActor {
                     log.error("A file I/O error occurred while copying or creating the new file!");
                     //TODO: destroy the program.
                 }
+                //file length is saved in a variable because it can be modified by the server after the following
+                //tell (the file could be deleted by the server, so its dimensions could virtually become 0.)
+                long fileLength = newFile.length();
 
                 //tell to the server to create a new entry for the FileTable
                 AllocationRequest newReq = new AllocationRequest(GUI.OpenedFile.getName(), newFile.length(),
                         GUI.OpenedFile.getTags(), (newFile.length() == 0) ? true : false);
                 server.tell(newReq, getSelf());
 
-                //spread the tags
-                SpreadInfos tagsMessage = new SpreadInfos(GUI.OpenedFile.getName(),
-                        GUI.OpenedFile.getTags(),
-                        Utilities.computeId(Utilities.getAddress(getSelf().path().address(), clusterSystemPort)));
-                clusterListenerActorRef.tell(tagsMessage, getSelf());
-
                 //the edit is performed only if the new file size is 0
-                if (newFile.length() == 0) {
+                if (fileLength == 0) {
                     startModify(newFile);
                 } else {
                     GUI.getStage().show();
@@ -253,7 +250,7 @@ public class GuiActor extends UntypedActor {
                 Alert alert = new Alert(Alert.AlertType.ERROR);
                 alert.setTitle("Error");
                 alert.setHeaderText("Insufficient free space");
-                alert.setContentText("You have not enough free space for the modifies you would apply to the file " + GUI.OpenedFile.getName() + "!");
+                alert.setContentText("You have not enough free space to store the changes you've done to " + GUI.OpenedFile.getName() + "!");
 
                 alert.showAndWait();
                 System.out.printf("simple answer handling if answer is not: Is the gui shown? %s", GUI.getStage().isShowing());
@@ -263,8 +260,6 @@ public class GuiActor extends UntypedActor {
                  deleting all tags and the file itself
                  can find infos in OpenedFile
                  */
-                //delete all tags
-                clusterListenerActorRef.tell(new SendDeleteInfos(GUI.OpenedFile.getName(), GUI.OpenedFile.getTags()), getSelf());
             }
             GUI.OpenedFile.unset();
 
