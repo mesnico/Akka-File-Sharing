@@ -5,17 +5,15 @@
  */
 package GUI;
 
-import Utils.Utilities;
 import ClusterListenerActor.messages.CreationResponse;
-import ClusterListenerActor.messages.SendDeleteInfos;
 import ClusterListenerActor.messages.EndModify;
-import ClusterListenerActor.messages.SpreadInfos;
 import ClusterListenerActor.messages.TagSearchGuiResponse;
 import FileTransfer.messages.AllocationRequest;
 import FileTransfer.messages.EnumEnding;
 import FileTransfer.messages.EnumFileModifier;
 import FileTransfer.messages.FileTransferResult;
 import FileTransfer.messages.SimpleAnswer;
+import FileTransfer.messages.UpdateFileEntry;
 import GUI.messages.GuiShutdown;
 import GUI.messages.ProgressUpdate;
 import GUI.messages.UpdateFreeSpace;
@@ -97,11 +95,14 @@ public class GuiActor extends UntypedActor {
             Alert alert = new Alert(Alert.AlertType.ERROR);
             alert.setTitle("Error");
             alert.setHeaderText("Failed to edit the file");
-            alert.setContentText("The file is not editable!");
+            alert.setContentText("The file is not editable! Try to ask for it in READ mode");
 
             alert.showAndWait();
-            //--- lunch load distribution (EndModify)
-            clusterListenerActorRef.tell(new EndModify(file.getName(), file.length()), getSelf());
+            //--- free the file busy-ness 
+            // load distribution is performed by the EndModify, that is achieved
+            // after the SimpleAnswer (with response YES because the file size isn't changed)
+            UpdateFileEntry updateRequest = new UpdateFileEntry(file.getName(),file.length(),false);
+            getServer().tell(updateRequest, getSelf());
         }
     }
 
