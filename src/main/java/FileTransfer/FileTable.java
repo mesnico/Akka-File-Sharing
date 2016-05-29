@@ -131,6 +131,10 @@ public class FileTable implements Serializable {
     public Set<Entry<String, FileElement>> asSet() {
         return fileTable.entrySet();
     }
+    
+    public Set<String> getKeySet(){
+        return fileTable.keySet();
+    }
 
     @Override
     public String toString() {

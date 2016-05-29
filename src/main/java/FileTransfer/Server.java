@@ -18,6 +18,8 @@ import FileTransfer.messages.AllocationRequest;
 import FileTransfer.messages.AuthorizationReply;
 import FileTransfer.messages.EnumEnding;
 import FileTransfer.messages.EnumFileModifier;
+import FileTransfer.messages.FileListRequest;
+import FileTransfer.messages.FileListResponse;
 import FileTransfer.messages.FileTransferResult;
 import FileTransfer.messages.Handshake;
 import FileTransfer.messages.Hello;
@@ -351,12 +353,11 @@ public class Server extends UntypedActorWithStash {
                     break;
             }
 
-            /*} else if (msg instanceof RegenerateInfosFromFiles){
-             RegenerateInfosFromFiles regenerateMessage = (RegenerateInfosFromFiles)msg;
-             for(Entry<String,FileElement> e : fileTable.asSet()){
-                
-             }
-             */
+        } else if (msg instanceof FileListRequest) {
+            FileListRequest request= (FileListRequest)msg;
+            FileListResponse response = new FileListResponse(fileTable.getKeySet(), request.getMemberRemovedId());
+            getSender().tell(response, getSelf());
+
         } else if (msg instanceof InitiateShutdown) {
             //virtually remove myself from the priority queue putting a very low size
             myFreeSpace = -initialFreeSpace;

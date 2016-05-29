@@ -19,6 +19,8 @@ import FileTransfer.FileTransferSoulReaper;
 import FileTransfer.messages.AuthorizationReply;
 import FileTransfer.messages.EnumBehavior;
 import FileTransfer.messages.EnumEnding;
+import FileTransfer.messages.FileListRequest;
+import FileTransfer.messages.FileListResponse;
 import FileTransfer.messages.FileTransferResult;
 import FileTransfer.messages.Handshake;
 import FileTransfer.messages.SendFreeSpaceSpread;
@@ -51,6 +53,7 @@ import akka.event.LoggingAdapter;
 import com.typesafe.config.Config;
 import java.math.BigInteger;
 import java.net.InetAddress;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -161,6 +164,7 @@ public class ClusterListenerActor extends UntypedActor {
 
         } else if (message instanceof MemberRemoved) {
             MemberRemoved mMemberRemoved = (MemberRemoved) message;
+            BigInteger memberRemovedId = Utilities.computeId(Utilities.getAddress(mMemberRemoved.member().address(), clusterSystemPort));
 
             //if I am removed myself from the cluster, then it is time to commit suicide
             if (mMemberRemoved.member().address().equals(cluster.selfAddress())) {
@@ -170,6 +174,10 @@ public class ClusterListenerActor extends UntypedActor {
 
             if (mMemberRemoved.previousStatus() == MemberStatus.down()) {
                 //the member was removed because crashed
+                
+                //i request the file list to the server in order to check for file name tags
+                //that must be regenerated
+                server.tell(new FileListRequest(memberRemovedId),getSelf());
                 log.info("Member {} is removed because crashed!!", mMemberRemoved.member());
             } else {
                 //the member shutted down gracefully
@@ -177,7 +185,7 @@ public class ClusterListenerActor extends UntypedActor {
             }
 
             //in any case, the member is removed from the local structure
-            Member removed = membersMap.deleteMemberById(Utilities.computeId(Utilities.getAddress(mMemberRemoved.member().address(), clusterSystemPort)));
+            Member removed = membersMap.deleteMemberById(memberRemovedId);
             if (removed == null) {
                 log.error("Member {} does not exist in membersMap!!", mMemberRemoved.member());
             } else {
@@ -204,6 +212,20 @@ public class ClusterListenerActor extends UntypedActor {
                 }
             }
             log.info("membersMap initialized: {}", membersMap);
+        
+        } else if (message instanceof FileListResponse){
+            FileListResponse flr = (FileListResponse) message;
+            BigInteger memberRemovedId = flr.getMemberRemovedId();
+            BigInteger myself = Utilities.computeId(Utilities.getAddress(getSelf().path().address(), clusterSystemPort));
+            
+            for(String fileName : flr.getFileList()){
+                BigInteger tagId = Utilities.computeId(fileName);
+                if(membersMap.getResponsibleById(tagId).equals(membersMap.getSuccessorById(memberRemovedId))){
+                    log.info("Tag fileName for file {} is going to be regenerated", fileName);
+                    SpreadInfos newInfo = new SpreadInfos(fileName, Collections.EMPTY_LIST, myself);
+                    getSelf().tell(newInfo, getSelf());
+                }
+            }
 
         } else if (message instanceof SendFreeSpaceSpread) {
             long freeByteSpace = ((SendFreeSpaceSpread) message).getFreeByteSpace();
@@ -371,8 +393,9 @@ public class ClusterListenerActor extends UntypedActor {
 
         } else if (message instanceof SpreadInfos) {
             //used from the EndModify and end of file transfer
-
             SpreadInfos msg = (SpreadInfos) message;
+            log.debug("Spreading infos for file {}",msg.getFileName());
+            
             Member responsible;
             for (String tag : msg.getTags()) {
                 //If the member where i'm going to put the tag is closing, then I put the tag on its successor
