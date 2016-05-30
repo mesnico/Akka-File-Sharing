@@ -159,7 +159,7 @@ public class FXMLMainController implements Initializable {
             Alert alert = new Alert(AlertType.ERROR);
             alert.setTitle("Error");
             alert.setHeaderText("Void search");
-            alert.setContentText("You have to insert some text in the search box befor start to search!");
+            alert.setContentText("You have to insert some text in the search box before starting the search!");
 
             alert.showAndWait();
         }

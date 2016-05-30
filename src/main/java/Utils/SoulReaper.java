@@ -30,6 +30,11 @@ abstract public class SoulReaper extends UntypedActor{
     public void onReceive(Object message){
         if(message instanceof WatchMe){
             //keep track of subscribed actors
+            if(watchedActors.contains(getSender())){
+                //do not add it again... 
+                log.debug("actor {} was already present in the soul list. It is ignored", getSender());
+                return;
+            }
             log.info("I'm watching actor {}",getSender());
             getContext().watch(getSender());
             watchedActors.add(getSender());
