@@ -2,7 +2,6 @@ package Startup;
 
 
 import Utils.AddressResolver;
-import Utils.SoulReaper;
 import ClusterListenerActor.ClusterListenerActor;
 import FileTransfer.Server;
 import akka.actor.ActorSystem;

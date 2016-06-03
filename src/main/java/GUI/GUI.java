@@ -3,6 +3,7 @@ package GUI;
 import ClusterListenerActor.messages.InitiateShutdown;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.util.List;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
@@ -15,7 +16,6 @@ import javafx.stage.WindowEvent;
 public class GUI extends Application {
 
     //this structure is needed to store name and tags of the file under modify (creazione)
-
     static public class OpenedFile {
 
         private static File importedFile;
@@ -56,6 +56,7 @@ public class GUI extends Application {
 
     private static Stage primaryStage;
     private static Stage secondaryStage;
+    private static BigInteger clusterListenerId;
 
     public static void setSecondaryStage(Stage secondaryStage) {
         GUI.secondaryStage = secondaryStage;
@@ -63,6 +64,11 @@ public class GUI extends Application {
 
     public static Stage getSecondaryStage() {
         return secondaryStage;
+    }
+
+    public static void setClusterListenerId(BigInteger clusterListenerId) {
+        GUI.clusterListenerId = clusterListenerId;
+        primaryStage.setTitle("Akka File Sharing - Node #" + clusterListenerId);
     }
 
     @Override
@@ -73,7 +79,7 @@ public class GUI extends Application {
         Scene scene = new Scene(root);
         scene.getStylesheets().add("/styles/Styles.css");
 
-        stage.setTitle("Akka File Sharing");// + clusterListenerId);
+        //stage.setTitle("Akka File Sharing" + clusterListenerId);
         stage.getIcons().add(new Image("ico.png"));
         stage.setScene(scene);
         stage.show();

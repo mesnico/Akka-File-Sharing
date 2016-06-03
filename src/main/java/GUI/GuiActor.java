@@ -18,6 +18,7 @@ import GUI.messages.GuiShutdown;
 import GUI.messages.ProgressUpdate;
 import GUI.messages.UpdateFreeSpace;
 import Utils.AddressResolver;
+import Utils.Utilities;
 import Utils.WatchMe;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
@@ -61,10 +62,11 @@ public class GuiActor extends UntypedActor {
     private final int clusterSystemPort;
     private final String tmpFilePath;
 
-    public GuiActor() {
+    public GuiActor() throws Exception{
         clusterSystemPort = config.getInt("akka.remote.netty.tcp.port");
         filePath = config.getString("app-settings.file-path");
         tmpFilePath = System.getProperty("java.io.tmpdir");
+        GUI.setClusterListenerId(Utilities.computeId(Utilities.getAddress(getSelf().path().address(), clusterSystemPort)));
     }
 
     public static String getFilePath() {
