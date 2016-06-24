@@ -6,26 +6,36 @@
 package Utils;
 
 import akka.actor.Address;
-import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.net.SocketException;
 import java.net.UnknownHostException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.util.Random;
+import javax.crypto.Cipher;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 /**
  *
  * @author nicky
  */
 public class Utilities {
-       //compute the member ID starting from the member address using the hash function
+    /*compute the member ID starting from the member address using a cipher
+    using a cipher we can fullfill the following properties:
+        - unicity of the generated IDs (if we always use the same key)
+        - uniform distribution of the IDs
+    */
     static public BigInteger computeId(String inString) {
+        String encryptionKey = "a7YgC24PèG._167";
+        String iv = "CIDIV_g5W.M+g54J";
+
         try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            md.reset();
-            md.update(inString.getBytes("UTF-8"));
-            return new BigInteger(md.digest()).mod(new BigInteger("1000"));
-        } catch (NoSuchAlgorithmException | UnsupportedEncodingException e) {
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding", "SunJCE");
+            SecretKeySpec key = new SecretKeySpec(encryptionKey.getBytes("UTF-8"), "AES");
+            cipher.init(Cipher.ENCRYPT_MODE, key,new IvParameterSpec(iv.getBytes("UTF-8")));
+            byte[] rawId = cipher.doFinal(inString.getBytes("UTF-8"));
+            return new BigInteger(rawId);
+        } catch(Exception e){
+            System.err.println("Some bad behavior occurred in Id generation: "+e.getMessage());
             return BigInteger.ZERO;
         }
     }
