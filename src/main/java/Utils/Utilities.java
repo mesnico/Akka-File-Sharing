@@ -19,7 +19,7 @@ import javax.crypto.spec.SecretKeySpec;
  * @author nicky
  */
 public class Utilities {
-    /*compute the member ID starting from the member address using a cipher
+    /*compute the ID starting from the file name using a cipher
     using a cipher we can fullfill the following properties:
         - unicity of the generated IDs (if we always use the same key)
         - uniform distribution of the IDs
@@ -38,6 +38,12 @@ public class Utilities {
             System.err.println("Some bad behavior occurred in Id generation: "+e.getMessage());
             return BigInteger.ZERO;
         }
+    }
+    
+    //compute the ID from from the address
+    static public BigInteger computeIdByAddress(String inString) {
+        String[] splits = inString.split("@");
+        return computeId(splits[1]);
     }
     
     //returns a string containing the remote address
