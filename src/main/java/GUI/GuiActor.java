@@ -66,7 +66,7 @@ public class GuiActor extends UntypedActor {
         clusterSystemPort = config.getInt("akka.remote.netty.tcp.port");
         filePath = config.getString("app-settings.file-path");
         tmpFilePath = System.getProperty("java.io.tmpdir");
-        GUI.setClusterListenerId(Utilities.computeId(Utilities.getAddress(getSelf().path().address(), clusterSystemPort)));
+        GUI.setClusterListenerId(Utilities.computeIdByAddress(Utilities.getAddress(getSelf().path().address(), clusterSystemPort)));
     }
 
     public static String getFilePath() {

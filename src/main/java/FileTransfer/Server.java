@@ -178,7 +178,7 @@ public class Server extends UntypedActorWithStash {
                 //spread the tags
                 SpreadInfos tagsMessage = new SpreadInfos(request.getFileName(),
                         request.getTags(),
-                        Utilities.computeId(Utilities.getAddress(getSelf().path().address(), localClusterSystemPort)));
+                        Utilities.computeIdByAddress(Utilities.getAddress(getSelf().path().address(), localClusterSystemPort)));
                 myClusterListener.tell(tagsMessage, getSelf());
 
                 log.debug("Received AllocationRequest. The size was 0 so no SimpleAnswer is sent back");
@@ -195,7 +195,7 @@ public class Server extends UntypedActorWithStash {
                     //spread the tags
                     SpreadInfos tagsMessage = new SpreadInfos(request.getFileName(),
                             request.getTags(),
-                            Utilities.computeId(Utilities.getAddress(getSelf().path().address(), localClusterSystemPort)));
+                            Utilities.computeIdByAddress(Utilities.getAddress(getSelf().path().address(), localClusterSystemPort)));
                     myClusterListener.tell(tagsMessage, getSelf());
 
                     getSender().tell(new SimpleAnswer(true), getSelf());
@@ -289,7 +289,7 @@ public class Server extends UntypedActorWithStash {
 
                         SpreadInfos tagsMessage = new SpreadInfos(fileName,
                                 fileTable.getFileElement(fileName).getTags(),
-                                Utilities.computeId(Utilities.getAddress(getSelf().path().address(), localClusterSystemPort)));
+                                Utilities.computeIdByAddress(Utilities.getAddress(getSelf().path().address(), localClusterSystemPort)));
                         myClusterListener.tell(tagsMessage, getSelf());
                     }
 
