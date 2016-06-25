@@ -62,7 +62,7 @@ public class GuiActor extends UntypedActor {
     private final int clusterSystemPort;
     private final String tmpFilePath;
 
-    public GuiActor() throws Exception{
+    public GuiActor() throws Exception {
         clusterSystemPort = config.getInt("akka.remote.netty.tcp.port");
         filePath = config.getString("app-settings.file-path");
         tmpFilePath = System.getProperty("java.io.tmpdir");
@@ -103,7 +103,7 @@ public class GuiActor extends UntypedActor {
             //--- free the file busy-ness 
             // load distribution is performed by the EndModify, that is achieved
             // after the SimpleAnswer (with response YES because the file size isn't changed)
-            UpdateFileEntry updateRequest = new UpdateFileEntry(file.getName(),file.length(),false);
+            UpdateFileEntry updateRequest = new UpdateFileEntry(file.getName(), file.length(), false);
             getServer().tell(updateRequest, getSelf());
         }
     }
@@ -217,9 +217,11 @@ public class GuiActor extends UntypedActor {
 
                         break;
 
-                    case FILE_RECEIVING_FAILED:
-                    case FILE_TO_RECEIVE_NOT_EXISTS:
                     case FILE_TO_RECEIVE_BUSY:
+                    case FILE_TO_RECEIVE_NOT_EXISTS:
+                    case NOT_ENOUGH_SPACE_FOR_RECEIVING:
+                    case FILE_RECEIVING_FAILED:
+                    case IO_ERROR_WHILE_RECEIVING:
                         alert = new Alert(Alert.AlertType.ERROR);
                         alert.setTitle("Error");
                         alert.setHeaderText("Receiving Failed");
