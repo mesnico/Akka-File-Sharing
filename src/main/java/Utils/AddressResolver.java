@@ -5,6 +5,7 @@
  */
 package Utils;
 
+import com.typesafe.config.Config;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
@@ -17,14 +18,22 @@ import java.util.Enumeration;
  * @author nicky
  */
 public class AddressResolver {
+    static Config config;
+    
+    static public void setConfig(Config c){
+        config = c;
+    }
+    
     static public String getMyIpAddress() throws UnknownHostException, SocketException {
+        String netInterfaceName = config.getString("app-settings.net-interface");
+        
         Enumeration<NetworkInterface> nets = NetworkInterface.getNetworkInterfaces();
         //skim all the network interfaces looking for the one I'm interest
         for (NetworkInterface netint : Collections.list(nets)){
             //displayInterfaceInformation(netint);
             //*
             if(netint.getDisplayName() != null //when netint.getDisplayName() is not null
-                    && netint.getDisplayName().contains("Hamachi")){//to connect to "Hamachi" VPN network interface
+                    && netint.getDisplayName().contains(netInterfaceName)){//to connect to "Hamachi" VPN network interface
                 //I'm interested only in the first address
                 String res = Collections.list(netint.getInetAddresses()).get(0).toString();
                 //the address is in the format "/x.y.w.z" and I want "x.y.w.z"

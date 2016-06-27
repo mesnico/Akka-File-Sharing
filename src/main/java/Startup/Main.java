@@ -34,6 +34,9 @@ public class Main {
             }
         }.start();
         
+        Config baseConfig = ConfigFactory.load("settings.conf");
+        AddressResolver.setConfig(baseConfig);
+        
         // Override the configuration of the port
         Config clusterConf = ConfigFactory
                 .parseString("akka.remote.netty.tcp.hostname=" + AddressResolver.getMyIpAddress())
