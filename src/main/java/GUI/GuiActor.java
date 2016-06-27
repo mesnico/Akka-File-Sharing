@@ -8,7 +8,7 @@ package GUI;
 import ClusterListenerActor.messages.CreationResponse;
 import ClusterListenerActor.messages.EndModify;
 import ClusterListenerActor.messages.TagSearchGuiResponse;
-import FileTransfer.messages.AllocationRequest;
+import FileTransfer.messages.AllocateAndSpreadRequest;
 import FileTransfer.messages.EnumEnding;
 import FileTransfer.messages.EnumFileModifier;
 import FileTransfer.messages.FileTransferResult;
@@ -145,7 +145,7 @@ public class GuiActor extends UntypedActor {
                 long fileLength = newFile.length();
 
                 //tell to the server to create a new entry for the FileTable
-                AllocationRequest newReq = new AllocationRequest(GUI.OpenedFile.getName(), newFile.length(),
+                AllocateAndSpreadRequest newReq = new AllocateAndSpreadRequest(GUI.OpenedFile.getName(), newFile.length(),
                         GUI.OpenedFile.getTags(), (newFile.length() == 0) ? true : false);
                 server.tell(newReq, getSelf());
 

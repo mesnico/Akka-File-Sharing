@@ -1,7 +1,5 @@
 package GUI;
 
-import ClusterListenerActor.messages.EndModify;
-import FileTransfer.messages.AllocationRequest;
 import FileTransfer.messages.UpdateFileEntry;
 import GUI.GUI.OpenedFile;
 import java.io.File;

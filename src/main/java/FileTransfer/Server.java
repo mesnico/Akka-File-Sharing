@@ -14,6 +14,8 @@ import ClusterListenerActor.messages.InitiateShutdown;
 import ClusterListenerActor.messages.LeaveAndClose;
 import ClusterListenerActor.messages.SendDeleteInfos;
 import ClusterListenerActor.messages.SpreadInfos;
+import FileTransfer.messages.AllocateAndSpreadRequest;
+import FileTransfer.messages.AllocateOnlyRequest;
 import FileTransfer.messages.AllocationRequest;
 import FileTransfer.messages.AuthorizationReply;
 import FileTransfer.messages.EnumEnding;
@@ -111,6 +113,58 @@ public class Server extends UntypedActorWithStash {
         }
     }
 
+    private void allocate(AllocationRequest request, boolean isTransfer) throws Exception {
+        //log.debug("An allocationRequest arrived, with ");
+
+        if (!isTransfer && request.getSize() == 0) {
+            boolean occupied = request.isBusy();
+            FileElement newElement = new FileElement(occupied, request.getSize(),
+                    request.getTags());
+            if (fileTable.createOrUpdateEntry(request.getFileName(), newElement) == false) {
+                log.error("Someone tried to send me the file {} I already own", request.getFileName());
+            }
+
+            //spread the tags
+            SpreadInfos tagsMessage = new SpreadInfos(request.getFileName(),
+                    request.getTags(),
+                    Utilities.computeIdByAddress(Utilities.getAddress(getSelf().path().address(), localClusterSystemPort)));
+            myClusterListener.tell(tagsMessage, getSelf());
+
+            log.debug("Received AllocationRequest. The size was 0 so no SimpleAnswer is sent back");
+        } else {
+            if (myFreeSpace >= request.getSize()) {
+                myFreeSpace -= request.getSize();
+                boolean occupied = request.isBusy();
+                FileElement newElement = new FileElement(occupied, request.getSize(),
+                        request.getTags());
+                if (fileTable.createOrUpdateEntry(request.getFileName(), newElement) == false) {
+                    log.error("Someone tried to send me the file {} I already own", request.getFileName());
+                }
+
+                if (!isTransfer) {
+                    //spread the tags
+                    SpreadInfos tagsMessage = new SpreadInfos(request.getFileName(),
+                            request.getTags(),
+                            Utilities.computeIdByAddress(Utilities.getAddress(getSelf().path().address(), localClusterSystemPort)));
+                    myClusterListener.tell(tagsMessage, getSelf());
+                }
+
+                getSender().tell(new SimpleAnswer(true), getSelf());
+                log.debug("Received AllocationRequest. Sending out the response: true");
+            } else {
+                getSender().tell(new SimpleAnswer(false), getSelf());
+                FileTransferResult dummyTransferResult
+                        = new FileTransferResult(EnumEnding.FILE_RECEIVING_FAILED,
+                                request.getFileName(), EnumFileModifier.WRITE);
+                receiverRollBack(dummyTransferResult);
+                log.debug("Received AllocationRequest. Sending out the response: false");
+            }
+            if (!isTransfer) {
+                myClusterListener.tell(new SendFreeSpaceSpread(myFreeSpace), getSelf());
+            }
+        }
+    }
+
     @Override
     public void preStart() throws Exception {
         myClusterListener = getContext().actorSelection("akka.tcp://ClusterSystem@" + AddressResolver.getMyIpAddress() + ":"
@@ -160,57 +214,15 @@ public class Server extends UntypedActorWithStash {
         } else if (msg instanceof CommandFailed) {
             getContext().stop(getSelf()); //in this case we may bring down the application (bind failed)
 
-            // ---------------------------- //
-            // ---- ALLOCATION REQUEST ---- //
-            // ---------------------------- //
-        } else if (msg instanceof AllocationRequest) {
-            //log.debug("An allocationRequest arrived, with ");
-            AllocationRequest request = (AllocationRequest) msg;
-
-            if (request.getSize() == 0) {
-                boolean occupied = request.isBusy();
-                FileElement newElement = new FileElement(occupied, request.getSize(),
-                        request.getTags());
-                if (fileTable.createOrUpdateEntry(request.getFileName(), newElement) == false) {
-                    log.error("Someone tried to send me the file {} I already own", request.getFileName());
-                }
-
-                //spread the tags
-                SpreadInfos tagsMessage = new SpreadInfos(request.getFileName(),
-                        request.getTags(),
-                        Utilities.computeIdByAddress(Utilities.getAddress(getSelf().path().address(), localClusterSystemPort)));
-                myClusterListener.tell(tagsMessage, getSelf());
-
-                log.debug("Received AllocationRequest. The size was 0 so no SimpleAnswer is sent back");
-            } else {
-                if (myFreeSpace >= request.getSize()) {
-                    myFreeSpace -= request.getSize();
-                    boolean occupied = request.isBusy();
-                    FileElement newElement = new FileElement(occupied, request.getSize(),
-                            request.getTags());
-                    if (fileTable.createOrUpdateEntry(request.getFileName(), newElement) == false) {
-                        log.error("Someone tried to send me the file {} I already own", request.getFileName());
-                    }
-
-                    //spread the tags
-                    SpreadInfos tagsMessage = new SpreadInfos(request.getFileName(),
-                            request.getTags(),
-                            Utilities.computeIdByAddress(Utilities.getAddress(getSelf().path().address(), localClusterSystemPort)));
-                    myClusterListener.tell(tagsMessage, getSelf());
-
-                    getSender().tell(new SimpleAnswer(true), getSelf());
-                    log.debug("Received AllocationRequest. Sending out the response: true");
-                } else {
-                    getSender().tell(new SimpleAnswer(false), getSelf());
-                    FileTransferResult dummyTransferResult
-                            = new FileTransferResult(EnumEnding.FILE_RECEIVING_FAILED,
-                                    request.getFileName(), EnumFileModifier.WRITE);
-                    receiverRollBack(dummyTransferResult);
-                    log.debug("Received AllocationRequest. Sending out the response: false");
-                }
-                myClusterListener.tell(new SendFreeSpaceSpread(myFreeSpace), getSelf());
-            }
-
+        // ---------------------------- //
+        // ---- ALLOCATION REQUEST ---- //
+        // ---------------------------- //
+        } else if (msg instanceof AllocateOnlyRequest) {
+            AllocateOnlyRequest request = (AllocateOnlyRequest) msg;
+            allocate(request, true);
+        } else if (msg instanceof AllocateAndSpreadRequest) {
+            AllocateAndSpreadRequest request = (AllocateAndSpreadRequest) msg;
+            allocate(request, false);
         } else if (msg instanceof UpdateFileEntry) {
             boolean permit;
             UpdateFileEntry updateRequest = (UpdateFileEntry) msg;
@@ -245,7 +257,9 @@ public class Server extends UntypedActorWithStash {
             SimpleAnswer answer = new SimpleAnswer(permit);
             getSender().tell(answer, getSelf());
 
-        } // --------------------------- //
+        } 
+        
+        // --------------------------- //
         // ---- HANDSHAKE MESSAGE ---- //
         // --------------------------- //        
         else if (msg instanceof Handshake) {
@@ -256,7 +270,9 @@ public class Server extends UntypedActorWithStash {
             AuthorizationReply reply = fileTable.testAndSet(handshake.getFileName(), handshake.getModifier());
             log.debug("Received Handshake. Sending out AuthReply: {}", reply);
             getSender().tell(reply, getSelf());
-        } // ------------------------------ //
+        } 
+
+        // ------------------------------ //
         // ---- FILE TRANSFER RESULT ---- //
         // ------------------------------ //
         else if (msg instanceof FileTransferResult) {
@@ -354,7 +370,7 @@ public class Server extends UntypedActorWithStash {
             }
 
         } else if (msg instanceof FileListRequest) {
-            FileListRequest request= (FileListRequest)msg;
+            FileListRequest request = (FileListRequest) msg;
             FileListResponse response = new FileListResponse(fileTable.getKeySet(), request.getMemberRemovedId());
             getSender().tell(response, getSelf());
 

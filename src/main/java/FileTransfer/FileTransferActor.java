@@ -6,7 +6,7 @@
 package FileTransfer;
 
 import FileTransfer.messages.Ack;
-import FileTransfer.messages.AllocationRequest;
+import FileTransfer.messages.AllocateOnlyRequest;
 import FileTransfer.messages.AuthorizationReply;
 import FileTransfer.messages.EnumAuthorizationReply;
 import FileTransfer.messages.EnumBehavior;
@@ -370,7 +370,7 @@ public class FileTransferActor extends UntypedActor {
                             // --- until the end of the protocol, when I'll spread this information
                             if (handshake.getModifier() == EnumFileModifier.WRITE) {
                                 size = reply.getSize();
-                                AllocationRequest request = new AllocationRequest(
+                                AllocateOnlyRequest request = new AllocateOnlyRequest(
                                         handshake.getFileName(), size, reply.getTags(), false);
                                 myServer.tell(request, getSelf());
                                 // --- if size is 0 I need also to send immediately a response to the interlocutor
