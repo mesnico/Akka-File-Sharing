@@ -35,6 +35,7 @@ import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
 import akka.actor.PoisonPill;
 import akka.actor.Props;
+import akka.actor.Terminated;
 import akka.actor.UntypedActorWithStash;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
@@ -202,6 +203,7 @@ public class Server extends UntypedActorWithStash {
         if (msg instanceof Bound) {
             myClusterListener.tell(msg, getSelf()); //Are we interested in this? (Bind was successful)
         } else if (msg instanceof Hello) {
+            getContext().watch(getSender());
             Hello hello = (Hello) msg;
             // --- the addressTable is used for concurrency purposes among different client
             // --- requests
@@ -209,7 +211,7 @@ public class Server extends UntypedActorWithStash {
             getSender().tell(newHello, getSelf());
 
             unstashAll();
-            getContext().become(waitingForConnection(hello.getPort(), getSender().path().name()), false);
+            getContext().become(waitingForConnection(hello.getPort(), getSender()), false);
 
         } else if (msg instanceof CommandFailed) {
             getContext().stop(getSelf()); //in this case we may bring down the application (bind failed)
@@ -397,9 +399,10 @@ public class Server extends UntypedActorWithStash {
         }
     }
 
-    private Procedure<Object> waitingForConnection(int remoteClusterSystemPort, String remoteActorName) {
+    private Procedure<Object> waitingForConnection(int remoteClusterSystemPort, ActorRef remoteActor) {
         return new Procedure<Object>() {
-
+            String remoteActorName = remoteActor.path().name();
+            
             @Override
             public void apply(Object msg) throws Exception {
                 if (msg instanceof Connected) {
@@ -411,6 +414,11 @@ public class Server extends UntypedActorWithStash {
                             remoteAddress.getAddress(), remoteClusterSystemPort, remoteActorName, getSender()));
                     getSender().tell(TcpMessage.register(handler), getSelf());
                     log.debug("I, the server, have received a connection request and I've accepted it");
+                    getContext().unwatch(remoteActor);
+                    unstashAll();
+                    getContext().unbecome();
+                } else if (msg instanceof Terminated){
+                    log.error("Remote FileTransferActor is dead. Stopped waiting for him");
                     unstashAll();
                     getContext().unbecome();
                 } else {
