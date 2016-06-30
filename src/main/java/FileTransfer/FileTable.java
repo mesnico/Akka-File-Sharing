@@ -8,12 +8,14 @@ package FileTransfer;
 import FileTransfer.messages.EnumFileModifier;
 import FileTransfer.messages.AuthorizationReply;
 import FileTransfer.messages.EnumAuthorizationReply;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -124,11 +126,20 @@ public class FileTable implements Serializable {
         return sum;
     }
     
-    public void freeAll(){
-        for (FileElement e : fileTable.values()) {
-            e.setOccupied(false);
+    public void keepConsistent(){
+        for(Iterator<HashMap.Entry<String,FileElement>>it=fileTable.entrySet().iterator();it.hasNext();){
+            HashMap.Entry<String, FileElement> entry = it.next();
+            String name = entry.getKey();
+            FileElement element = entry.getValue();
+            
+            element.setOccupied(false);
+            File f = new File(filePath + name);
+            if(f.length()!=element.getSize()){
+                f.delete();
+                it.remove();
+            }
         }
-    }
+    }       
 
     public FileElement getFileElement(String fileName) {
         return fileTable.get(fileName);

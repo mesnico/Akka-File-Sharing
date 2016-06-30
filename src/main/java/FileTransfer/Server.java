@@ -77,8 +77,8 @@ public class Server extends UntypedActorWithStash {
         System.out.println(filePath + "--" + myFreeSpace + "--" + tcpPort);
 
         fileTable = retrieveFileTable();
+        fileTable.keepConsistent();
         myFreeSpace -= fileTable.getTotalOccupiedSpace();
-        fileTable.freeAll();
     }
 
     // ----------------------------- //
