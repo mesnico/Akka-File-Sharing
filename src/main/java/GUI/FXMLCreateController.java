@@ -49,11 +49,11 @@ public class FXMLCreateController implements Initializable {
             alert.showAndWait();
             file_name.setText(newFileName.replaceAll("\\s+", ""));
             
-        } else if (!newFileName.matches("^[a-zA-Z0-9()_.-]+\\.(txt|bmp|jpg|png)$")) {
+        } else if (!newFileName.matches("^[a-zA-Z0-9()_.-]+\\.[a-z]+$")) {
             Alert alert = new Alert(Alert.AlertType.WARNING);
             alert.setTitle("Warning");
             alert.setHeaderText("File Name error");
-            alert.setContentText("File must be only txt, bmp, jpg or png");
+            alert.setContentText("File must have an extension");
             alert.showAndWait();
             file_name.setText(newFileName.replaceAll("\\s+", ""));
             
