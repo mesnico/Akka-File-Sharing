@@ -78,6 +78,7 @@ public class Server extends UntypedActorWithStash {
 
         fileTable = retrieveFileTable();
         myFreeSpace -= fileTable.getTotalOccupiedSpace();
+        fileTable.freeAll();
     }
 
     // ----------------------------- //

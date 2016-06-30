@@ -123,6 +123,12 @@ public class FileTable implements Serializable {
         }
         return sum;
     }
+    
+    public void freeAll(){
+        for (FileElement e : fileTable.values()) {
+            e.setOccupied(false);
+        }
+    }
 
     public FileElement getFileElement(String fileName) {
         return fileTable.get(fileName);
