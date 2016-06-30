@@ -488,6 +488,7 @@ public class ClusterListenerActor extends UntypedActor {
     private Member getNonClosingResponsable(String tag) {
         Member nonClosingResponsable;
         BigInteger realResponsible = membersMap.getResponsibleById(Utilities.computeId(tag));
+        System.out.println("tag: "+ tag+ ", id: "+Utilities.computeId(tag)+", responsible: "+ realResponsible);
         if (membersFreeSpace.getFreeSpaceElement(realResponsible).freeByteSpace < 0) {
             nonClosingResponsable = membersMap.getSuccessorMemberById(realResponsible);
         } else {

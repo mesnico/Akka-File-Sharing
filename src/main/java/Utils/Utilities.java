@@ -10,10 +10,10 @@ import java.math.BigInteger;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.util.Random;
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.util.Arrays;
 
 /**
  *
@@ -42,7 +42,10 @@ public class Utilities {
     }
     static public BigInteger computeId(String inString) {
         // the tag id has to be truncated in 16 bytes
-        return computeId(inString.getBytes()).mod(new BigInteger("65536"));
+        byte[] mod = new byte[17];
+        Arrays.fill(mod,(byte) 0);
+        mod[0] = (byte) 1;
+        return computeId(inString.getBytes()).mod(new BigInteger(mod));
     }
     
     //compute the ID from from the address
