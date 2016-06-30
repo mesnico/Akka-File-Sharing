@@ -42,51 +42,56 @@ public class FXMLCreateController implements Initializable {
         String newFileName = file_name.getText();
         file_name.setText(newFileName);
         if (newFileName.matches(".*\\s+.*")) {
-                Alert alert = new Alert(Alert.AlertType.WARNING);
-                alert.setTitle("Warning");
-                alert.setHeaderText("File Name contains one or more spaces");
-                alert.setContentText("File Name should not contains spaces. Try again with a name without spaces.");
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Warning");
+            alert.setHeaderText("File Name contains one or more spaces");
+            alert.setContentText("File Name should not contains spaces. Try again with a name without spaces.");
+            alert.showAndWait();
+            file_name.setText(newFileName.replaceAll("\\s+", ""));
+            
+        } else if (!newFileName.matches("^[a-zA-Z0-9()_.-]+\\.(txt|bmp|jpg|png)$")) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Warning");
+            alert.setHeaderText("File Name error");
+            alert.setContentText("File must be only txt, bmp, jpg or png");
+            alert.showAndWait();
+            file_name.setText(newFileName.replaceAll("\\s+", ""));
+            
+        } else if (!newFileName.isEmpty()) {
+            System.out.println("You clicked Create into the new window!");
+            System.out.println("Started create request");
 
-                alert.showAndWait();
-                file_name.setText(newFileName.replaceAll("\\s+", ""));
-        } else {
-            if (!newFileName.isEmpty()) {
-                System.out.println("You clicked Create into the new window!");
-                System.out.println("Started create request");
-
-                //validate the tags
-                List<String> tags = new ArrayList<>();
-                String tag = tag1.getText().replaceAll("\\s+", "").toLowerCase();
-                //if the tag is not empty
-                if (!tag.isEmpty()) {
-                    tags.add(tag);
-                }
-                tag = tag2.getText().replaceAll("\\s+", "").toLowerCase();
-                //if the tag is not empty and is not already present in the list
-                if (!tag.isEmpty() && !tags.contains(tag)) {
-                    tags.add(tag);
-                }
-                tag = tag3.getText().replaceAll("\\s+", "").toLowerCase();
-                if (!tag.isEmpty() && !tags.contains(tag)) {
-                    tags.add(tag);
-                }
-                tag = tag4.getText().replaceAll("\\s+", "").toLowerCase();
-                if (!tag.isEmpty() && !tags.contains(tag)) {
-                    tags.add(tag);
-                }
-                //set the OpenedFile
-                GUI.OpenedFile.set(newFileName, tags);
-
-                //chech for existing files with the same name
-                GuiActor.getClusterListenerActorRef().tell(new SendCreationRequest(newFileName), GuiActor.getGuiActorRef());
-            } else {
-                Alert alert = new Alert(Alert.AlertType.ERROR);
-                alert.setTitle("Error");
-                alert.setHeaderText("Empty name");
-                alert.setContentText("The name of the new file must contain at least a character!");
-
-                alert.showAndWait();
+            //validate the tags
+            List<String> tags = new ArrayList<>();
+            String tag = tag1.getText().replaceAll("\\s+", "").toLowerCase();
+            //if the tag is not empty
+            if (!tag.isEmpty()) {
+                tags.add(tag);
             }
+            tag = tag2.getText().replaceAll("\\s+", "").toLowerCase();
+            //if the tag is not empty and is not already present in the list
+            if (!tag.isEmpty() && !tags.contains(tag)) {
+                tags.add(tag);
+            }
+            tag = tag3.getText().replaceAll("\\s+", "").toLowerCase();
+            if (!tag.isEmpty() && !tags.contains(tag)) {
+                tags.add(tag);
+            }
+            tag = tag4.getText().replaceAll("\\s+", "").toLowerCase();
+            if (!tag.isEmpty() && !tags.contains(tag)) {
+                tags.add(tag);
+            }
+            //set the OpenedFile
+            GUI.OpenedFile.set(newFileName, tags);
+
+            //chech for existing files with the same name
+            GuiActor.getClusterListenerActorRef().tell(new SendCreationRequest(newFileName), GuiActor.getGuiActorRef());
+        } else {
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText("Empty name");
+            alert.setContentText("The name of the new file must contain at least a character!");
+            alert.showAndWait();
         }
     }
 

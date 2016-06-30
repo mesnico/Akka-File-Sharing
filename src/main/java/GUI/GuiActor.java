@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import java.text.DecimalFormat;
+import java.util.Comparator;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -90,8 +91,6 @@ public class GuiActor extends UntypedActor {
             });
 
             GUI.setSecondaryStage(stage);
-            GUI.getSecondaryStage().show();
-            GUI.getStage().hide();
 
         } catch (IOException ex) {
             Alert alert = new Alert(Alert.AlertType.ERROR);
@@ -105,6 +104,10 @@ public class GuiActor extends UntypedActor {
             // after the SimpleAnswer (with response YES because the file size isn't changed)
             UpdateFileEntry updateRequest = new UpdateFileEntry(file.getName(), file.length(), false);
             getServer().tell(updateRequest, getSelf());
+
+        } finally {
+            GUI.getSecondaryStage().show();
+            GUI.getStage().hide();
         }
     }
 
@@ -173,13 +176,7 @@ public class GuiActor extends UntypedActor {
             //for(FileEntry fe : r.getReturnedList()) tags.add(fe);
             log.info("Received search infos (ObservableList<FileEntry>): {}", tags);
 
-            // 3. Wrap the FilteredList in a SortedList. 
-            SortedList<FileEntry> sortedData = new SortedList<>(tags);
-            // 4. Bind the SortedList comparator to the TableView comparator.
-            sortedData.comparatorProperty().bind(FXMLMainController.getTable().comparatorProperty());
-
-            FXMLMainController.getTable().setItems(sortedData);
-            FXMLMainController.getTable().sort();
+            FXMLMainController.getTable().setItems(tags);
 
         } else if (message instanceof FileTransferResult) {
             FileTransferResult ftr = (FileTransferResult) message;

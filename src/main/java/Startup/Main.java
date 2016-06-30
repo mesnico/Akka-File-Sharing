@@ -40,8 +40,7 @@ public class Main {
         // Override the configuration of the port
         Config clusterConf = ConfigFactory
                 .parseString("akka.remote.netty.tcp.hostname=" + AddressResolver.getMyIpAddress())
-                .withFallback(
-                        ConfigFactory.load());
+                    .withFallback(ConfigFactory.load());
         //Config localConf = ConfigFactory.parseString("akka.remote.netty.tcp.port=" + (basePort+1)).withFallback(
         //                ConfigFactory.load("local.conf"));
 
