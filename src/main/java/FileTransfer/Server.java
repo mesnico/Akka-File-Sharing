@@ -86,6 +86,7 @@ public class Server extends UntypedActorWithStash {
     private void senderRollBack(FileTransferResult fileTransferResult) {
         String fileName = fileTransferResult.getFileName();
         if (fileTransferResult.getFileModifier() == EnumFileModifier.WRITE) {
+            log.info("Rollback: freeing file {} {}", filePath + fileName);
             fileTable.setOccupied(fileName, false);
         }
     }
@@ -95,7 +96,7 @@ public class Server extends UntypedActorWithStash {
         // --- corresponding space and delete the received part of the file  
         String fileName = fileTransferResult.getFileName();
         if (fileTransferResult.getFileModifier() == EnumFileModifier.WRITE) {
-            log.info("Deleting fileEntry and corresponding corrupted file {}", filePath + fileName);
+            log.info("Rollback: Deleting fileEntry and corresponding corrupted file {}", filePath + fileName);
             FileElement e = fileTable.deleteEntry(fileName);
             if (e == null) {
                 log.info("The rollBack has no effect on {}", fileName);
@@ -329,12 +330,12 @@ public class Server extends UntypedActorWithStash {
                 case NOT_ENOUGH_SPACE_FOR_SENDING:
                 case IO_ERROR_WHILE_SENDING:
                 case FILE_NO_MORE_BUSY:
+                case FILE_SENDING_FAILED:
                     senderRollBack(fileTransferResult);
                     //myGuiActor.tell(msg, getSelf());
                     break;
 
                 case FILE_TO_SEND_BUSY:
-                case FILE_SENDING_FAILED:
                     //myGuiActor.tell(msg, getSelf());
                     break;
 
