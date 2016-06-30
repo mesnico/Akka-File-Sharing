@@ -80,7 +80,7 @@ public class ClusterListenerActor extends UntypedActor {
     private ActorRef mediator;
 
     private final int clusterSystemPort;
-    private long myFreeSpace = 0;
+    private long myFreeSpace;
     private long initialFreeSpace;
 
     public ClusterListenerActor() throws Exception {
@@ -97,6 +97,7 @@ public class ClusterListenerActor extends UntypedActor {
         foundFiles = new FoundFiles();
 
         initialFreeSpace = config.getLong("app-settings.dedicated-space");
+        myFreeSpace = initialFreeSpace;
     }
 
     //subscribe to cluster changes
